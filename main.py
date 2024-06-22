@@ -1,69 +1,48 @@
 import streamlit as st
-from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
 import cv2
-import torch
-from model_code import ObjectDetectionModel
-import time
+from ultralytics import YOLO
 
-class VideoTransformer(VideoTransformerBase):
-    def __init__(self, model):
-        self.model = model
+# Load the custom-trained YOLO model
+model = YOLO('C:/Users/karar/Projects/Website/best.pt')
 
-    def transform(self, frame):
-        start_time = time.time()
+# Class name corresponding to your model
+class_name = "gun"
 
-        img = frame.to_ndarray(format="bgr24")
+# Initialize the webcam
+cap = cv2.VideoCapture(0)
 
-        # Preprocess the frame
-        processed_frame = self.model.preprocess_frame(img)
+# Streamlit app
+st.title("YOLO Object Detection")
+stframe = st.empty()
 
-        # Perform detection
-        detection_results = self.model.predict(processed_frame)
+def get_frame():
+    ret, frame = cap.read()
+    if not ret:
+        st.error("Error: Could not read frame.")
+        return None
+    return frame
 
-        # Visualize detections
-        annotated_frame = self.model.visualize_detections(img, detection_results)
+def process_frame(frame):
+    results = model(frame)
 
-        end_time = time.time()
-        fps = 1 / (end_time - start_time)
-        cv2.putText(annotated_frame, f'FPS: {fps:.2f}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+    for result in results:
+        boxes = result.boxes
+        for box in boxes:
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+            label = class_name  # Since there's only one class, label is always "gun"
 
-        return annotated_frame
+            # Draw the bounding box
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
-def main():
-    st.set_page_config(page_title='BananaGuard', page_icon=':camera:')
-    st.markdown(
-        """
-        <style>
-        .reportview-container {
-            background-color: #f0f0f0;
-        }
-        .title {
-            font-size: 38px;
-            font-weight: bold;
-            color: #333333;
-            margin-bottom: 20px;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-    st.markdown('<div class="title">BananaGuard</div>', unsafe_allow_html=True)
+            # Display the label
+            cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
 
-    # Load your trained model
-    model_path = "C:\\Users\\karar\\Projects\\Website\\trained_model.pt"
-    model = ObjectDetectionModel(model_path)
+    return frame
 
-    webrtc_streamer(
-        key="camera",
-        video_transformer_factory=lambda: VideoTransformer(model),
-        media_stream_constraints={
-            "video": {
-                "width": {"ideal": 640},
-                "height": {"ideal": 480},
-                "frameRate": {"ideal": 15, "max": 15},
-            }
-        }
-    )
+while True:
+    frame = get_frame()
+    if frame is not None:
+        processed_frame = process_frame(frame)
+        stframe.image(processed_frame, channels="BGR")
 
-if __name__ == '__main__':
-    main()
+cap.release()
