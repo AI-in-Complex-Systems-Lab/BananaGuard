@@ -10,12 +10,12 @@ if 'is_streaming' not in st.session_state:
 
 @st.cache_resource
 def load_models():
-    gun_model_1 = YOLO('C:/Users/karar/Projects/Website/yolov10.pt')
-    gun_model_2 = YOLO('C:/Users/karar/Projects/Website/yolov11.pt')
+    yolov10 = YOLO('WRITE THE PATH')
+    yolov11 = YOLO('WRITE THE PATH')
     yolov10_model = YOLO('yolov10n.pt')
     return {
-        "Gun Model 1": gun_model_1,
-        "Gun Model 2": gun_model_2,
+        "Gun Model Yolov10": yolov10,
+        "Gun Model Yolov11": yolov11,
         "YOLO v10": yolov10_model
     }
 
@@ -62,7 +62,7 @@ def main():
     st.title("BananaGuard - Live Stream Detection")
 
     sensitivity = st.slider("Sensitivity", 0, 2, 1, key=f"sensitivity_slider")
-    selected_gun_model = st.selectbox("Select Gun Model", ["Gun Model 1", "Gun Model 2"], key=f"gun_model_selector")
+    selected_gun_model = st.selectbox("Select Gun Model", ["Gun Model Yolov10", "Gun Model Yolov11"], key=f"gun_model_selector")
 
     start_button = st.button("Start Stream")
     stop_button = st.button("Stop Stream")
