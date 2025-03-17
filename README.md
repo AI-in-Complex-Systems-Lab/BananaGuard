@@ -1,7 +1,7 @@
 # bananaguard
 Use main.py for the website interface.
 
-Download yolov10.pt, yolov11.pt, detr and yolov10n.pt (the base models).
+Download yolov10.pt, yolov11.pt, detr and yolov10n.pt (the base model).
 
 Due to the large size of the RT-DETR model, I was unable to upload it to GitHub.
 
