@@ -13,10 +13,10 @@ if 'is_streaming' not in st.session_state:
 # Load the models
 @st.cache_resource
 def load_models():
-    gun_model_1 = YOLO('C:/Users/karar/Projects/Website/yolov10.pt') # Change the path to the yolov10.pt file
-    gun_model_2 = YOLO('C:/Users/karar/Projects/Website/yolo11.pt') # Change the path to the yolo11.pt file
-    gun_model_3 = RTDETR('C:/Users/karar/Projects/Website/detr.pt')  # Change the path to the detr.pt file
-    yolov10_model = YOLO('yolov10n.pt')
+    gun_model_1 = YOLO('./yolov10.pt') # Change the path to the yolov10.pt file
+    gun_model_2 = YOLO('./yolo11.pt') # Change the path to the yolo11.pt file
+    gun_model_3 = RTDETR('./detr.pt')  # Change the path to the detr.pt file
+    yolov10_model = YOLO('./yolov10n.pt')
     return {
         "YOLOv10": gun_model_1,
         "YOLO11": gun_model_2,
@@ -108,7 +108,7 @@ def main():
                         gun_models["Base_PreTrained_Model"], 
                         sensitivity)
         frame_rgb = cv2.cvtColor(processed_frame, cv2.COLOR_BGR2RGB)
-        frame_placeholder.image(frame_rgb, use_container_width=True)
+        frame_placeholder.image(frame_rgb)
         time.sleep(1/30)  # Cap frame rate at 30 FPS
     
     if not st.session_state.is_streaming and st.session_state.cap is not None:
