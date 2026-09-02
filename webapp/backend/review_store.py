@@ -1,5 +1,6 @@
 import json
 import threading
+import time
 from pathlib import Path
 
 
@@ -45,6 +46,8 @@ class ReviewStore:
                         "box": detection["box"],
                         "status": "pending",
                         "notes": "",
+                        "reviewed_by": None,
+                        "reviewed_at": None,
                     }
                 )
 
@@ -69,6 +72,7 @@ class ReviewStore:
         job_id,
         detection_id,
         status,
+        reviewed_by,
         label=None,
         box=None,
         notes=None,
@@ -88,6 +92,8 @@ class ReviewStore:
             for record in records:
                 if record["detection_id"] == detection_id:
                     record["status"] = status
+                    record["reviewed_by"] = reviewed_by
+                    record["reviewed_at"] = time.time()
 
                     if label is not None:
                         record["label"] = label

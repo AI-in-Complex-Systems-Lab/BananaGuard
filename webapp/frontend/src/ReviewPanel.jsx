@@ -1,14 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
+import { authFetch } from './api';
+import { useAuth } from './AuthContext';
 import BoxCorrectionModal from './BoxCorrectionModal';
 
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || 'http://localhost:8081';
 
 const PAGE_SIZE = 20;
 
 
+function statusBadgeClass(status) {
+  if (status === 'approved') return 'badge-success';
+  if (status === 'rejected') return 'badge-danger';
+  if (status === 'corrected') return 'badge-info';
+  return 'badge-warning';
+}
+
+
 function ReviewPanel({ jobId }) {
+  const { token } = useAuth();
+
   const [reviewData, setReviewData] = useState(null);
   const [filter, setFilter] = useState('all');
   const [page, setPage] = useState(1);
@@ -22,8 +31,9 @@ function ReviewPanel({ jobId }) {
 
     async function loadReviews() {
       try {
-        const response = await fetch(
-          `${API_BASE_URL}/api/jobs/${jobId}/reviews`
+        const response = await authFetch(
+          token,
+          `/api/jobs/${jobId}/reviews`
         );
 
         const data = await response.json();
@@ -51,7 +61,7 @@ function ReviewPanel({ jobId }) {
     return () => {
       cancelled = true;
     };
-  }, [jobId]);
+  }, [jobId, token]);
 
   const filteredDetections = useMemo(() => {
     if (!reviewData) return [];
@@ -84,8 +94,9 @@ function ReviewPanel({ jobId }) {
     setError('');
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/jobs/${jobId}/reviews/${detection.detection_id}`,
+      const response = await authFetch(
+        token,
+        `/api/jobs/${jobId}/reviews/${detection.detection_id}`,
         {
           method: 'PATCH',
           headers: {
@@ -146,7 +157,7 @@ function ReviewPanel({ jobId }) {
 
   if (error && !reviewData) {
     return (
-      <div style={styles.errorBox}>
+      <div className="error-banner">
         Unable to load review data: {error}
       </div>
     );
@@ -154,7 +165,7 @@ function ReviewPanel({ jobId }) {
 
   if (!reviewData) {
     return (
-      <div style={styles.loadingBox}>
+      <div className="empty-state">
         Loading detection reviews...
       </div>
     );
@@ -166,20 +177,27 @@ function ReviewPanel({ jobId }) {
     <section style={styles.panel}>
       <div style={styles.headingRow}>
         <div>
-          <h3 style={styles.heading}>
+          <h3 style={{ margin: 0 }}>
             Human Detection Review
           </h3>
 
-          <p style={styles.description}>
+          <p
+            style={{
+              color: 'var(--text-secondary)',
+              marginTop: 4,
+            }}
+          >
             Approve correct detections, reject false
-            positives, or correct inaccurate labels.
+            positives, or correct inaccurate labels and
+            boxes.
           </p>
         </div>
 
         <select
           value={filter}
           onChange={changeFilter}
-          style={styles.select}
+          className="text-input"
+          style={{ maxWidth: 200 }}
         >
           <option value="all">All detections</option>
           <option value="pending">Pending</option>
@@ -189,7 +207,7 @@ function ReviewPanel({ jobId }) {
         </select>
       </div>
 
-      <div style={styles.summaryGrid}>
+      <div className="stat-grid">
         <SummaryCard
           label="Total"
           value={summary.total}
@@ -198,62 +216,53 @@ function ReviewPanel({ jobId }) {
         <SummaryCard
           label="Pending"
           value={summary.pending}
+          accent="warning"
         />
 
         <SummaryCard
           label="Approved"
           value={summary.approved}
+          accent="success"
         />
 
         <SummaryCard
           label="Rejected"
           value={summary.rejected}
+          accent="danger"
         />
 
         <SummaryCard
           label="Corrected"
           value={summary.corrected}
+          accent="blue"
         />
       </div>
 
       {error && (
-        <div style={styles.errorBox}>
+        <div
+          className="error-banner"
+          style={{ marginBottom: 16 }}
+        >
           {error}
         </div>
       )}
 
       {visibleDetections.length === 0 ? (
-        <div style={styles.emptyBox}>
+        <div className="empty-state">
           No detections match this filter.
         </div>
       ) : (
-        <div style={styles.tableWrapper}>
-          <table style={styles.table}>
+        <div style={{ overflowX: 'auto' }}>
+          <table className="data-table">
             <thead>
               <tr>
-                <th style={styles.headerCell}>
-                  Time
-                </th>
-
-                <th style={styles.headerCell}>
-                  Frame
-                </th>
-
-                <th style={styles.headerCell}>
-                  Label
-                </th>
-
-                <th style={styles.headerCell}>
-                  Confidence
-                </th>
-
-                <th style={styles.headerCell}>
-                  Status
-                </th>
-
-                <th style={styles.headerCell}>
-                  Review
-                </th>
+                <th>Time</th>
+                <th>Frame</th>
+                <th>Label</th>
+                <th>Confidence</th>
+                <th>Status</th>
+                <th>Reviewed By</th>
+                <th>Review</th>
               </tr>
             </thead>
 
@@ -265,39 +274,40 @@ function ReviewPanel({ jobId }) {
 
                 return (
                   <tr key={detection.detection_id}>
-                    <td style={styles.cell}>
+                    <td>
                       {detection.timestamp_seconds}s
                     </td>
 
-                    <td style={styles.cell}>
-                      {detection.frame}
-                    </td>
+                    <td>{detection.frame}</td>
 
-                    <td style={styles.cell}>
-                      {detection.label}
-                    </td>
+                    <td>{detection.label}</td>
 
-                    <td style={styles.cell}>
+                    <td>
                       {Math.round(
                         detection.score * 100
                       )}
                       %
                     </td>
 
-                    <td style={styles.cell}>
+                    <td>
                       <span
-                        style={{
-                          ...styles.statusBadge,
-                          ...getStatusStyle(
-                            detection.status
-                          ),
-                        }}
+                        className={`badge ${statusBadgeClass(
+                          detection.status
+                        )}`}
                       >
                         {detection.status}
                       </span>
                     </td>
 
-                    <td style={styles.cell}>
+                    <td
+                      style={{
+                        color: 'var(--text-muted)',
+                      }}
+                    >
+                      {detection.reviewed_by || '—'}
+                    </td>
+
+                    <td>
                       <div style={styles.actions}>
                         <button
                           type="button"
@@ -308,7 +318,7 @@ function ReviewPanel({ jobId }) {
                               'approved'
                             )
                           }
-                          style={styles.approveButton}
+                          className="btn btn-success btn-sm"
                         >
                           Approve
                         </button>
@@ -322,7 +332,7 @@ function ReviewPanel({ jobId }) {
                               'rejected'
                             )
                           }
-                          style={styles.rejectButton}
+                          className="btn btn-danger btn-sm"
                         >
                           Reject
                         </button>
@@ -335,7 +345,7 @@ function ReviewPanel({ jobId }) {
                               detection
                             )
                           }
-                          style={styles.correctButton}
+                          className="btn btn-sm"
                         >
                           Correct
                         </button>
@@ -358,12 +368,14 @@ function ReviewPanel({ jobId }) {
               Math.max(1, currentPage - 1)
             )
           }
-          style={styles.pageButton}
+          className="btn btn-ghost btn-sm"
         >
           Previous
         </button>
 
-        <span>
+        <span
+          style={{ color: 'var(--text-secondary)' }}
+        >
           Page {page} of {pageCount}
         </span>
 
@@ -378,7 +390,7 @@ function ReviewPanel({ jobId }) {
               )
             )
           }
-          style={styles.pageButton}
+          className="btn btn-ghost btn-sm"
         >
           Next
         </button>
@@ -397,42 +409,17 @@ function ReviewPanel({ jobId }) {
 }
 
 
-function SummaryCard({ label, value }) {
+function SummaryCard({ label, value, accent }) {
   return (
-    <div style={styles.summaryCard}>
-      <strong style={styles.summaryValue}>
-        {value}
-      </strong>
-
-      <span style={styles.summaryLabel}>
-        {label}
-      </span>
+    <div
+      className={`stat-card${
+        accent ? ` stat-accent-${accent}` : ''
+      }`}
+    >
+      <div className="stat-value">{value}</div>
+      <div className="stat-label">{label}</div>
     </div>
   );
-}
-
-
-function getStatusStyle(status) {
-  const colors = {
-    pending: {
-      background: '#fff4cc',
-      color: '#765b00',
-    },
-    approved: {
-      background: '#dcfce7',
-      color: '#166534',
-    },
-    rejected: {
-      background: '#fee2e2',
-      color: '#991b1b',
-    },
-    corrected: {
-      background: '#dbeafe',
-      color: '#1e40af',
-    },
-  };
-
-  return colors[status] || colors.pending;
 }
 
 
@@ -440,7 +427,7 @@ const styles = {
   panel: {
     marginTop: '32px',
     paddingTop: '24px',
-    borderTop: '1px solid #d9deea',
+    borderTop: '1px solid var(--border)',
   },
 
   headingRow: {
@@ -449,76 +436,7 @@ const styles = {
     gap: '20px',
     alignItems: 'flex-start',
     flexWrap: 'wrap',
-  },
-
-  heading: {
-    margin: 0,
-  },
-
-  description: {
-    color: '#5d6678',
-  },
-
-  select: {
-    padding: '10px 12px',
-    border: '1px solid #b9c1d1',
-    borderRadius: '8px',
-  },
-
-  summaryGrid: {
-    display: 'grid',
-    gridTemplateColumns:
-      'repeat(auto-fit, minmax(110px, 1fr))',
-    gap: '12px',
-    margin: '20px 0',
-  },
-
-  summaryCard: {
-    display: 'flex',
-    flexDirection: 'column',
-    padding: '14px',
-    background: '#f5f7fb',
-    borderRadius: '8px',
-  },
-
-  summaryValue: {
-    fontSize: '24px',
-  },
-
-  summaryLabel: {
-    marginTop: '4px',
-    color: '#5d6678',
-  },
-
-  tableWrapper: {
-    overflowX: 'auto',
-    border: '1px solid #d9deea',
-    borderRadius: '8px',
-  },
-
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-  },
-
-  headerCell: {
-    padding: '12px',
-    textAlign: 'left',
-    background: '#f5f7fb',
-    borderBottom: '1px solid #d9deea',
-  },
-
-  cell: {
-    padding: '12px',
-    borderBottom: '1px solid #edf0f5',
-  },
-
-  statusBadge: {
-    display: 'inline-block',
-    padding: '5px 9px',
-    borderRadius: '999px',
-    fontSize: '13px',
-    textTransform: 'capitalize',
+    marginBottom: '18px',
   },
 
   actions: {
@@ -527,68 +445,12 @@ const styles = {
     gap: '6px',
   },
 
-  approveButton: {
-    padding: '7px 10px',
-    border: 0,
-    borderRadius: '6px',
-    background: '#15803d',
-    color: '#ffffff',
-    cursor: 'pointer',
-  },
-
-  rejectButton: {
-    padding: '7px 10px',
-    border: 0,
-    borderRadius: '6px',
-    background: '#b91c1c',
-    color: '#ffffff',
-    cursor: 'pointer',
-  },
-
-  correctButton: {
-    padding: '7px 10px',
-    border: '1px solid #175cd3',
-    borderRadius: '6px',
-    background: '#ffffff',
-    color: '#175cd3',
-    cursor: 'pointer',
-  },
-
   pagination: {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
     gap: '16px',
     marginTop: '18px',
-  },
-
-  pageButton: {
-    padding: '8px 12px',
-    border: '1px solid #b9c1d1',
-    borderRadius: '6px',
-    background: '#ffffff',
-    cursor: 'pointer',
-  },
-
-  loadingBox: {
-    marginTop: '24px',
-    padding: '18px',
-    background: '#f5f7fb',
-    borderRadius: '8px',
-  },
-
-  emptyBox: {
-    padding: '20px',
-    background: '#f5f7fb',
-    borderRadius: '8px',
-  },
-
-  errorBox: {
-    marginTop: '16px',
-    padding: '12px',
-    color: '#991b1b',
-    background: '#fee2e2',
-    borderRadius: '8px',
   },
 };
 

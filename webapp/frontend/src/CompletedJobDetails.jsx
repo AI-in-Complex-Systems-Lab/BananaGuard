@@ -1,29 +1,50 @@
+import { mediaUrl } from './api';
+import { useAuth } from './AuthContext';
 import ReviewPanel from './ReviewPanel';
 
 
-function CompletedJobDetails({ job, apiBaseUrl }) {
+function CompletedJobDetails({ job }) {
+  const { token } = useAuth();
+
   const resultUrl = job?.result_url
-    ? `${apiBaseUrl}${job.result_url}`
+    ? mediaUrl(job.result_url, token)
     : null;
 
   return (
-    <div style={styles.resultsBox}>
+    <div className="card-padded" style={styles.resultsBox}>
       <h3>Detection Summary</h3>
 
-      <p>
-        <strong>Processed frames:</strong>{' '}
-        {job.processed_frames}
-      </p>
+      <div className="stat-grid">
+        <div className="stat-card stat-accent-blue">
+          <div className="stat-value">
+            {job.processed_frames}
+          </div>
 
-      <p>
-        <strong>Frames containing detections:</strong>{' '}
-        {job.frames_with_detections}
-      </p>
+          <div className="stat-label">
+            Processed Frames
+          </div>
+        </div>
 
-      <p>
-        <strong>Total detections:</strong>{' '}
-        {job.total_detections}
-      </p>
+        <div className="stat-card stat-accent-warning">
+          <div className="stat-value">
+            {job.frames_with_detections}
+          </div>
+
+          <div className="stat-label">
+            Frames with Detections
+          </div>
+        </div>
+
+        <div className="stat-card stat-accent-danger">
+          <div className="stat-value">
+            {job.total_detections}
+          </div>
+
+          <div className="stat-label">
+            Total Detections
+          </div>
+        </div>
+      </div>
 
       {resultUrl && (
         <>
@@ -80,7 +101,7 @@ const styles = {
   resultsBox: {
     marginTop: '24px',
     paddingTop: '18px',
-    borderTop: '1px solid #d9deea',
+    borderTop: '1px solid var(--border)',
   },
 
   resultVideo: {
@@ -88,23 +109,25 @@ const styles = {
     maxWidth: '720px',
     marginTop: '16px',
     background: '#000000',
+    borderRadius: 'var(--radius-md)',
   },
 
   downloadLink: {
-    color: '#175cd3',
+    color: 'var(--accent)',
     fontWeight: 600,
   },
 
   timeline: {
     maxHeight: '280px',
     overflowY: 'auto',
-    border: '1px solid #d9deea',
-    borderRadius: '8px',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-md)',
   },
 
   timelineItem: {
     padding: '10px 12px',
-    borderBottom: '1px solid #edf0f5',
+    borderBottom: '1px solid var(--border)',
+    color: 'var(--text-secondary)',
   },
 };
 

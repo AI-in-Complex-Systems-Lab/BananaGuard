@@ -1,8 +1,7 @@
 import { useRef, useState } from 'react';
+import { mediaUrl } from './api';
+import { useAuth } from './AuthContext';
 
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || 'http://localhost:8081';
 
 const MAX_DISPLAY_WIDTH = 720;
 
@@ -13,6 +12,7 @@ function BoxCorrectionModal({
   onCancel,
   onSave,
 }) {
+  const { token } = useAuth();
   const overlayRef = useRef(null);
 
   const [label, setLabel] = useState(detection.label);
@@ -22,7 +22,10 @@ function BoxCorrectionModal({
   const [dragStart, setDragStart] = useState(null);
   const [dragCurrent, setDragCurrent] = useState(null);
 
-  const frameUrl = `${API_BASE_URL}/api/jobs/${jobId}/frames/${detection.frame}`;
+  const frameUrl = mediaUrl(
+    `/api/jobs/${jobId}/frames/${detection.frame}`,
+    token
+  );
 
   function handleImageLoad(event) {
     const naturalWidth = event.target.naturalWidth;
@@ -212,14 +215,14 @@ function BoxCorrectionModal({
               onChange={(event) =>
                 setLabel(event.target.value)
               }
-              style={styles.input}
+              className="text-input"
             />
           </label>
 
           <button
             type="button"
             onClick={resetBox}
-            style={styles.resetButton}
+            className="btn"
           >
             Reset box
           </button>
@@ -229,7 +232,7 @@ function BoxCorrectionModal({
           <button
             type="button"
             onClick={onCancel}
-            style={styles.cancelButton}
+            className="btn btn-ghost"
           >
             Cancel
           </button>
@@ -238,7 +241,7 @@ function BoxCorrectionModal({
             type="button"
             onClick={handleSave}
             disabled={!label.trim()}
-            style={styles.saveButton}
+            className="btn btn-primary"
           >
             Save correction
           </button>
@@ -253,7 +256,7 @@ const styles = {
   backdrop: {
     position: 'fixed',
     inset: 0,
-    background: 'rgba(15, 23, 42, 0.6)',
+    background: 'rgba(3, 7, 18, 0.72)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -262,13 +265,15 @@ const styles = {
   },
 
   modal: {
-    background: '#ffffff',
-    borderRadius: '12px',
+    background: 'var(--bg-panel)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-lg)',
     padding: '24px',
     maxWidth: '800px',
     width: '100%',
     maxHeight: '90vh',
     overflowY: 'auto',
+    color: 'var(--text-primary)',
   },
 
   title: {
@@ -276,7 +281,7 @@ const styles = {
   },
 
   hint: {
-    color: '#5d6678',
+    color: 'var(--text-secondary)',
     marginTop: '6px',
   },
 
@@ -286,6 +291,8 @@ const styles = {
     background: '#000000',
     cursor: 'crosshair',
     maxWidth: '100%',
+    borderRadius: 'var(--radius-md)',
+    overflow: 'hidden',
   },
 
   imageError: {
@@ -302,7 +309,7 @@ const styles = {
 
   dragBox: {
     position: 'absolute',
-    border: '2px dashed #ffcc00',
+    border: '2px dashed var(--amber)',
     pointerEvents: 'none',
   },
 
@@ -321,44 +328,11 @@ const styles = {
     flex: 1,
   },
 
-  input: {
-    padding: '10px 12px',
-    border: '1px solid #b9c1d1',
-    borderRadius: '8px',
-    fontWeight: 400,
-  },
-
-  resetButton: {
-    padding: '10px 14px',
-    border: '1px solid #b9c1d1',
-    borderRadius: '8px',
-    background: '#ffffff',
-    cursor: 'pointer',
-  },
-
   actions: {
     display: 'flex',
     justifyContent: 'flex-end',
     gap: '12px',
     marginTop: '22px',
-  },
-
-  cancelButton: {
-    padding: '10px 16px',
-    border: '1px solid #b9c1d1',
-    borderRadius: '8px',
-    background: '#ffffff',
-    cursor: 'pointer',
-  },
-
-  saveButton: {
-    padding: '10px 16px',
-    border: 0,
-    borderRadius: '8px',
-    background: '#175cd3',
-    color: '#ffffff',
-    fontWeight: 600,
-    cursor: 'pointer',
   },
 };
 

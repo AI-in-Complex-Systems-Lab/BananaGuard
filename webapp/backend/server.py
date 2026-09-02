@@ -9,6 +9,7 @@ import cv2
 import numpy as np
 import uvicorn
 from fastapi import (
+    Depends,
     FastAPI,
     File,
     HTTPException,
@@ -20,8 +21,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from ultralytics import YOLO
 
+import auth as auth_module
+from auth import (
+    AuthService,
+    configure_auth_service,
+    get_current_user,
+    get_current_user_flexible,
+    load_or_create_secret_key,
+)
+from auth_api import auth_router
 from job_store import JobStore
 from review_api import review_router, review_store
+from user_store import UserStore
 
 
 app = FastAPI(title="BananaGuard API")
@@ -38,10 +49,12 @@ storage_directory = server_directory / "storage"
 uploads_directory = storage_directory / "uploads"
 outputs_directory = storage_directory / "outputs"
 jobs_directory = storage_directory / "jobs"
+users_directory = storage_directory / "users"
 
 uploads_directory.mkdir(parents=True, exist_ok=True)
 outputs_directory.mkdir(parents=True, exist_ok=True)
 jobs_directory.mkdir(parents=True, exist_ok=True)
+users_directory.mkdir(parents=True, exist_ok=True)
 
 confidence_threshold = float(
     os.environ.get("CONFIDENCE_THRESHOLD", "0.50")
@@ -74,6 +87,46 @@ for _job in jobs.values():
         job_store.write(_job["job_id"], _job)
 
 
+user_store = UserStore(users_directory)
+
+secret_key = os.environ.get(
+    "AUTH_SECRET_KEY"
+) or load_or_create_secret_key(
+    storage_directory / "auth_secret.key"
+)
+
+configure_auth_service(
+    AuthService(secret_key, user_store)
+)
+
+bootstrap_result = user_store.bootstrap_admin_if_empty()
+
+if bootstrap_result is not None:
+    bootstrap_username, bootstrap_password = (
+        bootstrap_result
+    )
+
+    bootstrap_path = (
+        storage_directory / "admin_bootstrap.txt"
+    )
+
+    bootstrap_path.write_text(
+        f"username: {bootstrap_username}\n"
+        f"password: {bootstrap_password}\n",
+        encoding="utf-8",
+    )
+
+    print(
+        "=" * 60
+        + "\nCreated default administrator account:\n"
+        f"  username: {bootstrap_username}\n"
+        f"  password: {bootstrap_password}\n"
+        f"Also saved to {bootstrap_path}\n"
+        "Sign in and change this password immediately.\n"
+        + "=" * 60
+    )
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -82,6 +135,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router)
 app.include_router(review_router)
 
 
@@ -425,7 +479,8 @@ async def health():
     status_code=202,
 )
 async def upload_video(
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
 ):
     original_filename = (
         file.filename or "uploaded-video"
@@ -492,6 +547,7 @@ async def upload_video(
             "job_id": job_id,
             "filename": original_filename,
             "uploaded_bytes": uploaded_size,
+            "uploaded_by": current_user["username"],
             "created_at": time.time(),
             "status": "queued",
             "progress": 0,
@@ -526,7 +582,9 @@ async def upload_video(
 
 
 @app.get("/api/jobs")
-async def list_jobs():
+async def list_jobs(
+    current_user: dict = Depends(get_current_user),
+):
     with jobs_lock:
         all_jobs = [dict(job) for job in jobs.values()]
 
@@ -538,8 +596,77 @@ async def list_jobs():
     return [get_public_job(job) for job in all_jobs]
 
 
+@app.get("/api/dashboard")
+async def get_dashboard(
+    current_user: dict = Depends(get_current_user),
+):
+    with jobs_lock:
+        all_jobs = [dict(job) for job in jobs.values()]
+
+    all_jobs.sort(
+        key=lambda job: job.get("created_at", 0),
+        reverse=True,
+    )
+
+    totals = {
+        "jobs": len(all_jobs),
+        "completed_jobs": 0,
+        "processing_jobs": 0,
+        "failed_jobs": 0,
+        "total_detections": 0,
+        "pending_reviews": 0,
+        "approved_reviews": 0,
+        "rejected_reviews": 0,
+        "corrected_reviews": 0,
+    }
+
+    for job in all_jobs:
+        status = job.get("status")
+
+        if status == "completed":
+            totals["completed_jobs"] += 1
+        elif status in {"queued", "processing"}:
+            totals["processing_jobs"] += 1
+        elif status == "failed":
+            totals["failed_jobs"] += 1
+
+        totals["total_detections"] += job.get(
+            "total_detections", 0
+        ) or 0
+
+        review_summary = review_store.summary(
+            job["job_id"]
+        )
+
+        if review_summary is not None:
+            totals["pending_reviews"] += review_summary[
+                "pending"
+            ]
+            totals["approved_reviews"] += review_summary[
+                "approved"
+            ]
+            totals["rejected_reviews"] += review_summary[
+                "rejected"
+            ]
+            totals["corrected_reviews"] += review_summary[
+                "corrected"
+            ]
+
+    recent_jobs = [
+        get_public_job(job) for job in all_jobs[:8]
+    ]
+
+    return {
+        "totals": totals,
+        "recent_jobs": recent_jobs,
+    }
+
+
 @app.get("/api/jobs/{job_id}")
-async def get_job(job_id: str):
+async def get_job(
+    job_id: str,
+    current_user: dict = Depends(get_current_user),
+):
     job = get_job_copy(job_id)
 
     if job is None:
@@ -552,7 +679,12 @@ async def get_job(job_id: str):
 
 
 @app.get("/api/jobs/{job_id}/result")
-async def download_result(job_id: str):
+async def download_result(
+    job_id: str,
+    current_user: dict = Depends(
+        get_current_user_flexible
+    ),
+):
     job = get_job_copy(job_id)
 
     if job is None:
@@ -613,7 +745,13 @@ def extract_frame(input_path, frame_number):
 
 
 @app.get("/api/jobs/{job_id}/frames/{frame_number}")
-async def get_frame(job_id: str, frame_number: int):
+async def get_frame(
+    job_id: str,
+    frame_number: int,
+    current_user: dict = Depends(
+        get_current_user_flexible
+    ),
+):
     if frame_number < 0:
         raise HTTPException(
             status_code=400,
@@ -658,6 +796,18 @@ async def get_frame(job_id: str, frame_number: int):
 async def websocket_endpoint(
     websocket: WebSocket
 ):
+    token = websocket.query_params.get("token")
+
+    if token is None:
+        await websocket.close(code=4401)
+        return
+
+    try:
+        auth_module.auth_service.user_from_token(token)
+    except HTTPException:
+        await websocket.close(code=4401)
+        return
+
     await websocket.accept()
     print("Webcam client connected")
 

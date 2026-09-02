@@ -1,9 +1,10 @@
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from auth import get_current_user
 from review_store import ReviewStore
 
 
@@ -42,7 +43,10 @@ class DetectionReviewRequest(BaseModel):
 @review_router.get(
     "/api/jobs/{job_id}/reviews"
 )
-async def list_reviews(job_id: str):
+async def list_reviews(
+    job_id: str,
+    current_user: dict = Depends(get_current_user),
+):
     detections = review_store.list(job_id)
 
     if detections is None:
@@ -65,6 +69,7 @@ async def update_review(
     job_id: str,
     detection_id: str,
     request: DetectionReviewRequest,
+    current_user: dict = Depends(get_current_user),
 ):
     if (
         request.status == "corrected"
@@ -83,6 +88,7 @@ async def update_review(
         job_id=job_id,
         detection_id=detection_id,
         status=request.status,
+        reviewed_by=current_user["username"],
         label=request.label,
         box=request.box,
         notes=request.notes,
