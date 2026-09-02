@@ -1,0 +1,39 @@
+# macOS
+.DS_Store
+._*
+
+# Editors
+.vscode/
+.idea/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+backend/venv/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Generated data and ML outputs
+runs/
+data/
+datasets/
+*.mp4
+*.mov
+*.avi
+*.mkv
+
+# Logs
+*.log
+
+# Uploaded videos and generated results
+backend/storage/
