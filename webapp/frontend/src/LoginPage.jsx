@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { API_BASE_URL } from './api';
 import { useAuth } from './AuthContext';
 
 
@@ -9,6 +10,42 @@ function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [bootstrapHint, setBootstrapHint] =
+    useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadBootstrapHint() {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/auth/bootstrap-hint`
+        );
+
+        const data = await response.json();
+
+        if (!cancelled && data.available) {
+          setBootstrapHint(data);
+        }
+      } catch {
+        // No hint available; the login form still works normally.
+      }
+    }
+
+    loadBootstrapHint();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function fillBootstrapCredentials() {
+    if (!bootstrapHint) return;
+
+    setUsername(bootstrapHint.username);
+    setPassword(bootstrapHint.password);
+    setError('');
+  }
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -44,6 +81,38 @@ function LoginPage() {
             </p>
           </div>
         </div>
+
+        {bootstrapHint && (
+          <div
+            className="info-banner"
+            style={{ marginBottom: 16 }}
+          >
+            <strong>First-time setup:</strong> no
+            accounts have had their password changed
+            yet. Default administrator login is{' '}
+            <code>{bootstrapHint.username}</code> /{' '}
+            <code>{bootstrapHint.password}</code>.
+            <div style={{ marginTop: 10 }}>
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={fillBootstrapCredentials}
+              >
+                Fill in credentials
+              </button>
+            </div>
+            <div
+              style={{
+                marginTop: 8,
+                fontSize: 12,
+                opacity: 0.85,
+              }}
+            >
+              This notice disappears automatically once
+              the administrator password is changed.
+            </div>
+          </div>
+        )}
 
         {error && (
           <div

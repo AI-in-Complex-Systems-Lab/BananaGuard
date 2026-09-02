@@ -95,8 +95,12 @@ secret_key = os.environ.get(
     storage_directory / "auth_secret.key"
 )
 
+bootstrap_path = (
+    storage_directory / "admin_bootstrap.txt"
+)
+
 configure_auth_service(
-    AuthService(secret_key, user_store)
+    AuthService(secret_key, user_store, bootstrap_path)
 )
 
 bootstrap_result = user_store.bootstrap_admin_if_empty()
@@ -104,10 +108,6 @@ bootstrap_result = user_store.bootstrap_admin_if_empty()
 if bootstrap_result is not None:
     bootstrap_username, bootstrap_password = (
         bootstrap_result
-    )
-
-    bootstrap_path = (
-        storage_directory / "admin_bootstrap.txt"
     )
 
     bootstrap_path.write_text(

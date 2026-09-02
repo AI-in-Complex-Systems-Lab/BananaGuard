@@ -25,6 +25,20 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
 
+@auth_router.get("/bootstrap-hint")
+async def bootstrap_hint():
+    credentials = get_auth_service().read_bootstrap_credentials()
+
+    if credentials is None:
+        return {"available": False}
+
+    return {
+        "available": True,
+        "username": credentials["username"],
+        "password": credentials["password"],
+    }
+
+
 @auth_router.post("/login")
 async def login(request: LoginRequest):
     auth_service = get_auth_service()
@@ -83,6 +97,10 @@ async def change_password(
             status_code=400,
             detail=str(error),
         )
+
+    auth_service.clear_bootstrap_credentials_if_matching(
+        current_user["username"]
+    )
 
     return {"status": "ok"}
 

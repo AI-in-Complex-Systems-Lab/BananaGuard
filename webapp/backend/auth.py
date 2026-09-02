@@ -31,9 +31,57 @@ def load_or_create_secret_key(path):
 
 
 class AuthService:
-    def __init__(self, secret_key, user_store: UserStore):
+    def __init__(
+        self,
+        secret_key,
+        user_store: UserStore,
+        bootstrap_credentials_path=None,
+    ):
         self.secret_key = secret_key
+        self.bootstrap_credentials_path = (
+            Path(bootstrap_credentials_path)
+            if bootstrap_credentials_path
+            else None
+        )
         self.user_store = user_store
+
+    def read_bootstrap_credentials(self):
+        if (
+            self.bootstrap_credentials_path is None
+            or not self.bootstrap_credentials_path.exists()
+        ):
+            return None
+
+        lines = self.bootstrap_credentials_path.read_text(
+            encoding="utf-8"
+        ).splitlines()
+
+        values = {}
+
+        for line in lines:
+            if ":" not in line:
+                continue
+
+            key, _, value = line.partition(":")
+            values[key.strip()] = value.strip()
+
+        if "username" not in values or "password" not in values:
+            return None
+
+        return values
+
+    def clear_bootstrap_credentials_if_matching(
+        self, username
+    ):
+        credentials = self.read_bootstrap_credentials()
+
+        if credentials is None:
+            return
+
+        if credentials["username"] == username:
+            self.bootstrap_credentials_path.unlink(
+                missing_ok=True
+            )
 
     def create_token(self, user):
         payload = {
