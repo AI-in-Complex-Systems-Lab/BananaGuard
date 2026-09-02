@@ -3,6 +3,10 @@ import { websocketUrl } from './api';
 import { useAuth } from './AuthContext';
 
 
+const RECONNECT_INITIAL_DELAY_MS = 1000;
+const RECONNECT_MAX_DELAY_MS = 10000;
+
+
 function drawBoxes(canvas, detections) {
   if (!canvas) return;
 
@@ -33,109 +37,56 @@ function drawBoxes(canvas, detections) {
 }
 
 
+function bannerClassName(connectionState) {
+  if (connectionState === 'connected') return 'info-banner';
+  if (connectionState === 'error') return 'error-banner';
+
+  if (
+    connectionState === 'connecting' ||
+    connectionState === 'reconnecting'
+  ) {
+    return 'warning-banner';
+  }
+
+  return 'info-banner';
+}
+
+
 function WebcamPanel() {
   const { token } = useAuth();
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const socketRef = useRef(null);
+  const streamRef = useRef(null);
+  const sendIntervalRef = useRef(null);
+  const reconnectTimeoutRef = useRef(null);
+  const reconnectDelayRef = useRef(
+    RECONNECT_INITIAL_DELAY_MS
+  );
+  const isRunningRef = useRef(false);
+  const tokenRef = useRef(token);
 
+  const [isRunning, setIsRunning] = useState(false);
+  const [connectionState, setConnectionState] =
+    useState('idle');
   const [status, setStatus] = useState(
-    'Initializing camera...'
+    'Camera is stopped.'
   );
 
-  useEffect(() => {
-    const websocket = new WebSocket(
-      websocketUrl(token)
-    );
+  tokenRef.current = token;
 
-    socketRef.current = websocket;
-
-    websocket.onopen = () => {
-      setStatus('Connected. Waiting for camera stream...');
-    };
-
-    websocket.onclose = () => {
-      setStatus('Disconnected');
-    };
-
-    websocket.onerror = () => {
-      setStatus('WebSocket error');
-    };
-
-    websocket.onmessage = (event) => {
-      try {
-        const detections = JSON.parse(event.data);
-
-        if (detections.length > 0) {
-          setStatus(
-            `Alert: ${detections.length} gun detection(s)`
-          );
-        } else {
-          setStatus('Camera active — no gun detected');
-        }
-
-        drawBoxes(canvasRef.current, detections);
-      } catch (error) {
-        console.error(
-          'Unable to process detection response:',
-          error
-        );
-
-        setStatus('Invalid response from backend');
-      }
-    };
-
-    return () => {
-      if (
-        websocket.readyState === WebSocket.OPEN ||
-        websocket.readyState === WebSocket.CONNECTING
-      ) {
-        websocket.close();
-      }
-
-      socketRef.current = null;
-    };
-  }, [token]);
-
-  useEffect(() => {
-    let cameraStream;
-
-    async function startCamera() {
-      try {
-        cameraStream =
-          await navigator.mediaDevices.getUserMedia({
-            video: {
-              width: 640,
-              height: 480,
-            },
-            audio: false,
-          });
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = cameraStream;
-        }
-      } catch (error) {
-        console.error(
-          'Unable to start camera:',
-          error
-        );
-
-        setStatus(`Camera error: ${error.message}`);
-      }
+  function stopSendLoop() {
+    if (sendIntervalRef.current) {
+      clearInterval(sendIntervalRef.current);
+      sendIntervalRef.current = null;
     }
+  }
 
-    startCamera();
+  function startSendLoop() {
+    stopSendLoop();
 
-    return () => {
-      cameraStream
-        ?.getTracks()
-        .forEach((track) => track.stop());
-    };
-  }, []);
-
-  useEffect(() => {
-    const intervalId = setInterval(() => {
+    sendIntervalRef.current = setInterval(() => {
       const websocket = socketRef.current;
       const video = videoRef.current;
 
@@ -163,9 +114,7 @@ function WebcamPanel() {
 
       const context = temporaryCanvas.getContext(
         '2d',
-        {
-          willReadFrequently: true,
-        }
+        { willReadFrequently: true }
       );
 
       context.drawImage(
@@ -193,8 +142,180 @@ function WebcamPanel() {
         0.5
       );
     }, 100);
+  }
 
-    return () => clearInterval(intervalId);
+  function connectSocket() {
+    const websocket = new WebSocket(
+      websocketUrl(tokenRef.current)
+    );
+
+    socketRef.current = websocket;
+
+    websocket.onopen = () => {
+      reconnectDelayRef.current =
+        RECONNECT_INITIAL_DELAY_MS;
+
+      setConnectionState('connected');
+      setStatus(
+        'Connected. Watching for firearms...'
+      );
+
+      startSendLoop();
+    };
+
+    websocket.onmessage = (event) => {
+      try {
+        const detections = JSON.parse(event.data);
+
+        if (detections.length > 0) {
+          setStatus(
+            `Alert: ${detections.length} gun detection(s)`
+          );
+        } else {
+          setStatus(
+            'Camera active — no gun detected'
+          );
+        }
+
+        drawBoxes(canvasRef.current, detections);
+      } catch (error) {
+        console.error(
+          'Unable to process detection response:',
+          error
+        );
+      }
+    };
+
+    websocket.onclose = () => {
+      stopSendLoop();
+
+      if (socketRef.current === websocket) {
+        socketRef.current = null;
+      }
+
+      if (!isRunningRef.current) {
+        setConnectionState('idle');
+        return;
+      }
+
+      const delay = reconnectDelayRef.current;
+
+      reconnectDelayRef.current = Math.min(
+        delay * 2,
+        RECONNECT_MAX_DELAY_MS
+      );
+
+      setConnectionState('reconnecting');
+      setStatus(
+        `Connection lost. Reconnecting in ${Math.round(
+          delay / 1000
+        )}s...`
+      );
+
+      reconnectTimeoutRef.current = setTimeout(() => {
+        reconnectTimeoutRef.current = null;
+
+        if (isRunningRef.current) {
+          connectSocket();
+        }
+      }, delay);
+    };
+
+    websocket.onerror = () => {
+      websocket.close();
+    };
+  }
+
+  function cleanupResources() {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+
+    stopSendLoop();
+
+    const socket = socketRef.current;
+    socketRef.current = null;
+
+    if (
+      socket &&
+      (socket.readyState === WebSocket.OPEN ||
+        socket.readyState === WebSocket.CONNECTING)
+    ) {
+      socket.close();
+    }
+
+    streamRef.current
+      ?.getTracks()
+      .forEach((track) => track.stop());
+
+    streamRef.current = null;
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  }
+
+  async function handleStart() {
+    if (isRunningRef.current) return;
+
+    isRunningRef.current = true;
+    setIsRunning(true);
+    reconnectDelayRef.current =
+      RECONNECT_INITIAL_DELAY_MS;
+    setConnectionState('connecting');
+    setStatus('Requesting camera access...');
+
+    try {
+      const stream =
+        await navigator.mediaDevices.getUserMedia({
+          video: { width: 640, height: 480 },
+          audio: false,
+        });
+
+      if (!isRunningRef.current) {
+        stream.getTracks().forEach((track) =>
+          track.stop()
+        );
+
+        return;
+      }
+
+      streamRef.current = stream;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+
+      connectSocket();
+    } catch (error) {
+      console.error(
+        'Unable to start camera:',
+        error
+      );
+
+      setStatus(`Camera error: ${error.message}`);
+      setConnectionState('error');
+      isRunningRef.current = false;
+      setIsRunning(false);
+      cleanupResources();
+    }
+  }
+
+  function handleStop() {
+    isRunningRef.current = false;
+    setIsRunning(false);
+    setConnectionState('idle');
+    setStatus('Camera is stopped.');
+    cleanupResources();
+  }
+
+  useEffect(() => {
+    return () => {
+      isRunningRef.current = false;
+      cleanupResources();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -209,10 +330,29 @@ function WebcamPanel() {
       </div>
 
       <div
-        className="info-banner"
-        style={{ marginBottom: 20 }}
+        className={bannerClassName(connectionState)}
+        style={{
+          marginBottom: 20,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 16,
+          flexWrap: 'wrap',
+        }}
       >
-        <strong>Status:</strong> {status}
+        <span>
+          <strong>Status:</strong> {status}
+        </span>
+
+        <button
+          type="button"
+          className={
+            isRunning ? 'btn btn-danger' : 'btn btn-primary'
+          }
+          onClick={isRunning ? handleStop : handleStart}
+        >
+          {isRunning ? 'Stop Camera' : 'Start Camera'}
+        </button>
       </div>
 
       <div
@@ -237,6 +377,12 @@ function WebcamPanel() {
             height="480"
             style={styles.canvas}
           />
+
+          {!isRunning && (
+            <div style={styles.placeholder}>
+              Camera is stopped
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -270,6 +416,17 @@ const styles = {
     width: '640px',
     height: '480px',
     maxWidth: '100%',
+  },
+
+  placeholder: {
+    position: 'absolute',
+    inset: 0,
+    zIndex: 5,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'var(--text-muted)',
+    fontSize: 14,
   },
 };
 

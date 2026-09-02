@@ -19,6 +19,7 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
+from pydantic import BaseModel
 from ultralytics import YOLO
 
 import auth as auth_module
@@ -28,6 +29,7 @@ from auth import (
     get_current_user,
     get_current_user_flexible,
     load_or_create_secret_key,
+    require_admin,
 )
 from auth_api import auth_router
 from job_store import JobStore
@@ -45,7 +47,11 @@ model_path = Path(
     os.environ.get("MODEL_PATH", default_model_path)
 )
 
-storage_directory = server_directory / "storage"
+storage_directory = Path(
+    os.environ.get(
+        "STORAGE_DIR", server_directory / "storage"
+    )
+)
 uploads_directory = storage_directory / "uploads"
 outputs_directory = storage_directory / "outputs"
 jobs_directory = storage_directory / "jobs"
@@ -56,9 +62,31 @@ outputs_directory.mkdir(parents=True, exist_ok=True)
 jobs_directory.mkdir(parents=True, exist_ok=True)
 users_directory.mkdir(parents=True, exist_ok=True)
 
-confidence_threshold = float(
-    os.environ.get("CONFIDENCE_THRESHOLD", "0.50")
-)
+settings_lock = threading.Lock()
+
+settings = {
+    "confidence_threshold": float(
+        os.environ.get("CONFIDENCE_THRESHOLD", "0.50")
+    ),
+}
+
+MINIMUM_CONFIDENCE_THRESHOLD = 0.05
+MAXIMUM_CONFIDENCE_THRESHOLD = 0.95
+
+
+def get_confidence_threshold():
+    with settings_lock:
+        return settings["confidence_threshold"]
+
+
+def set_confidence_threshold(value):
+    with settings_lock:
+        settings["confidence_threshold"] = value
+
+
+class SettingsUpdateRequest(BaseModel):
+    confidence_threshold: float | None = None
+
 
 maximum_upload_size = 2 * 1024 * 1024 * 1024
 
@@ -174,7 +202,7 @@ def run_inference(image):
         results = model(
             image,
             verbose=False,
-            conf=confidence_threshold,
+            conf=get_confidence_threshold(),
         )
 
     return results[0]
@@ -468,9 +496,53 @@ async def health():
         "model": model_path.name,
         "classes": model.names,
         "confidence_threshold": (
-            confidence_threshold
+            get_confidence_threshold()
         ),
         "active_jobs": active_jobs,
+    }
+
+
+@app.get("/api/settings")
+async def get_settings(
+    current_user: dict = Depends(get_current_user),
+):
+    return {
+        "confidence_threshold": get_confidence_threshold(),
+        "minimum_confidence_threshold": (
+            MINIMUM_CONFIDENCE_THRESHOLD
+        ),
+        "maximum_confidence_threshold": (
+            MAXIMUM_CONFIDENCE_THRESHOLD
+        ),
+    }
+
+
+@app.patch("/api/settings")
+async def update_settings(
+    request: SettingsUpdateRequest,
+    current_user: dict = Depends(require_admin),
+):
+    if request.confidence_threshold is not None:
+        if not (
+            MINIMUM_CONFIDENCE_THRESHOLD
+            <= request.confidence_threshold
+            <= MAXIMUM_CONFIDENCE_THRESHOLD
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "confidence_threshold must be "
+                    f"between {MINIMUM_CONFIDENCE_THRESHOLD} "
+                    f"and {MAXIMUM_CONFIDENCE_THRESHOLD}"
+                ),
+            )
+
+        set_confidence_threshold(
+            request.confidence_threshold
+        )
+
+    return {
+        "confidence_threshold": get_confidence_threshold(),
     }
 
 

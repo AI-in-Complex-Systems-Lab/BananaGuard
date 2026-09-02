@@ -8,11 +8,10 @@ const NAV_ITEMS = [
   { key: 'history', icon: '≡', label: 'Job History' },
 ];
 
-const ADMIN_NAV_ITEM = {
-  key: 'admin',
-  icon: '⚙',
-  label: 'User Management',
-};
+const ADMIN_NAV_ITEMS = [
+  { key: 'admin', icon: '⚙', label: 'User Management' },
+  { key: 'settings', icon: '◐', label: 'Settings' },
+];
 
 const VIEW_TITLES = {
   dashboard: 'Dashboard',
@@ -20,6 +19,7 @@ const VIEW_TITLES = {
   webcam: 'Live Camera',
   history: 'Job History',
   admin: 'User Management',
+  settings: 'Settings',
 };
 
 function initials(name) {
@@ -39,7 +39,7 @@ function AppShell({ activeView, onNavigate, children }) {
 
   const navItems =
     user?.role === 'admin'
-      ? [...NAV_ITEMS, ADMIN_NAV_ITEM]
+      ? [...NAV_ITEMS, ...ADMIN_NAV_ITEMS]
       : NAV_ITEMS;
 
   return (

@@ -7,6 +7,7 @@ import UploadPanel from './UploadPanel';
 import WebcamPanel from './WebcamPanel';
 import JobHistoryPanel from './JobHistoryPanel';
 import UsersAdminPage from './UsersAdminPage';
+import SettingsPage from './SettingsPage';
 
 
 function AuthenticatedApp({ user }) {
@@ -50,6 +51,9 @@ function AuthenticatedApp({ user }) {
 
       {activeView === 'admin' &&
         user.role === 'admin' && <UsersAdminPage />}
+
+      {activeView === 'settings' &&
+        user.role === 'admin' && <SettingsPage />}
     </AppShell>
   );
 }
