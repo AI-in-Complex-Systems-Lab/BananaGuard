@@ -1,6 +1,7 @@
 import asyncio
 import os
 import threading
+import time
 import uuid
 from pathlib import Path
 
@@ -16,28 +17,38 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from ultralytics import YOLO
+
+from job_store import JobStore
+from review_api import review_router, review_store
 
 
 app = FastAPI(title="BananaGuard API")
 
 server_directory = Path(__file__).resolve().parent
-default_model_path = server_directory.parent.parent / "yolo11.pt"
-model_path = Path(os.environ.get("MODEL_PATH", default_model_path))
+default_model_path = (
+    server_directory.parent.parent / "yolo11.pt"
+)
+model_path = Path(
+    os.environ.get("MODEL_PATH", default_model_path)
+)
 
 storage_directory = server_directory / "storage"
 uploads_directory = storage_directory / "uploads"
 outputs_directory = storage_directory / "outputs"
+jobs_directory = storage_directory / "jobs"
 
 uploads_directory.mkdir(parents=True, exist_ok=True)
 outputs_directory.mkdir(parents=True, exist_ok=True)
+jobs_directory.mkdir(parents=True, exist_ok=True)
 
 confidence_threshold = float(
     os.environ.get("CONFIDENCE_THRESHOLD", "0.50")
 )
 
-maximum_upload_size = 2 * 1024 * 1024 * 1024  # 2 GB
+maximum_upload_size = 2 * 1024 * 1024 * 1024
+
 allowed_video_extensions = {
     ".mp4",
     ".mov",
@@ -51,7 +62,16 @@ model = YOLO(str(model_path))
 
 model_lock = threading.Lock()
 jobs_lock = threading.Lock()
-jobs = {}
+
+job_store = JobStore(jobs_directory)
+jobs = job_store.load_all()
+
+for _job in jobs.values():
+    if _job.get("status") in {"queued", "processing"}:
+        _job["status"] = "failed"
+        _job["message"] = "Processing was interrupted by a server restart"
+        _job["error"] = "Processing was interrupted by a server restart"
+        job_store.write(_job["job_id"], _job)
 
 
 app.add_middleware(
@@ -62,11 +82,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(review_router)
+
 
 def update_job(job_id, **values):
     with jobs_lock:
         if job_id in jobs:
             jobs[job_id].update(values)
+            job_snapshot = dict(jobs[job_id])
+        else:
+            job_snapshot = None
+
+    if job_snapshot is not None:
+        job_store.write(job_id, job_snapshot)
 
 
 def get_job_copy(job_id):
@@ -169,29 +197,47 @@ def process_video(job_id, input_path, output_path):
             message="Opening video",
         )
 
-        video_capture = cv2.VideoCapture(str(input_path))
-
-        if not video_capture.isOpened():
-            raise RuntimeError("Unable to open the uploaded video")
-
-        total_frames = int(
-            video_capture.get(cv2.CAP_PROP_FRAME_COUNT)
+        video_capture = cv2.VideoCapture(
+            str(input_path)
         )
 
-        frames_per_second = video_capture.get(cv2.CAP_PROP_FPS)
+        if not video_capture.isOpened():
+            raise RuntimeError(
+                "Unable to open the uploaded video"
+            )
 
-        if not frames_per_second or frames_per_second <= 0:
+        total_frames = int(
+            video_capture.get(
+                cv2.CAP_PROP_FRAME_COUNT
+            )
+        )
+
+        frames_per_second = video_capture.get(
+            cv2.CAP_PROP_FPS
+        )
+
+        if (
+            not frames_per_second
+            or frames_per_second <= 0
+        ):
             frames_per_second = 30.0
 
         frame_width = int(
-            video_capture.get(cv2.CAP_PROP_FRAME_WIDTH)
+            video_capture.get(
+                cv2.CAP_PROP_FRAME_WIDTH
+            )
         )
+
         frame_height = int(
-            video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
+            video_capture.get(
+                cv2.CAP_PROP_FRAME_HEIGHT
+            )
         )
 
         if frame_width <= 0 or frame_height <= 0:
-            raise RuntimeError("The video has invalid dimensions")
+            raise RuntimeError(
+                "The video has invalid dimensions"
+            )
 
         codec = cv2.VideoWriter_fourcc(*"mp4v")
 
@@ -204,7 +250,8 @@ def process_video(job_id, input_path, output_path):
 
         if not video_writer.isOpened():
             raise RuntimeError(
-                "Unable to create the annotated output video"
+                "Unable to create the annotated "
+                "output video"
             )
 
         frame_index = 0
@@ -220,13 +267,19 @@ def process_video(job_id, input_path, output_path):
                 break
 
             result = run_inference(frame)
-            detections = serialize_detections(result)
+            detections = serialize_detections(
+                result
+            )
 
             if detections:
-                timestamp_seconds = frame_index / frames_per_second
+                timestamp_seconds = (
+                    frame_index / frames_per_second
+                )
 
                 frames_with_detections += 1
-                total_detections += len(detections)
+                total_detections += len(
+                    detections
+                )
 
                 detection_events.append(
                     {
@@ -243,13 +296,19 @@ def process_video(job_id, input_path, output_path):
                 frame,
                 detections,
             )
-            video_writer.write(annotated_frame)
 
+            video_writer.write(annotated_frame)
             frame_index += 1
 
             if total_frames > 0:
                 progress = min(
-                    int((frame_index / total_frames) * 100),
+                    int(
+                        (
+                            frame_index
+                            / total_frames
+                        )
+                        * 100
+                    ),
                     99,
                 )
             else:
@@ -261,7 +320,8 @@ def process_video(job_id, input_path, output_path):
                     progress=progress,
                     processed_frames=frame_index,
                     message=(
-                        f"Processing frame {frame_index}"
+                        f"Processing frame "
+                        f"{frame_index}"
                         + (
                             f" of {total_frames}"
                             if total_frames > 0
@@ -269,12 +329,23 @@ def process_video(job_id, input_path, output_path):
                         )
                     ),
                 )
+
                 previous_progress = progress
 
         if frame_index == 0:
             raise RuntimeError(
-                "The uploaded video did not contain readable frames"
+                "The uploaded video did not "
+                "contain readable frames"
             )
+
+        review_store.initialize(
+            job_id,
+            detection_events,
+        )
+
+        review_summary = review_store.summary(
+            job_id
+        )
 
         update_job(
             job_id,
@@ -282,11 +353,21 @@ def process_video(job_id, input_path, output_path):
             progress=100,
             message="Processing complete",
             processed_frames=frame_index,
-            total_frames=total_frames or frame_index,
-            frames_with_detections=frames_with_detections,
+            total_frames=(
+                total_frames or frame_index
+            ),
+            frames_with_detections=(
+                frames_with_detections
+            ),
             total_detections=total_detections,
             detection_events=detection_events,
-            result_url=f"/api/jobs/{job_id}/result",
+            review_summary=review_summary,
+            reviews_url=(
+                f"/api/jobs/{job_id}/reviews"
+            ),
+            result_url=(
+                f"/api/jobs/{job_id}/result"
+            ),
         )
 
     except Exception as error:
@@ -324,47 +405,77 @@ async def health():
         active_jobs = sum(
             1
             for job in jobs.values()
-            if job["status"] in {"queued", "processing"}
+            if job["status"]
+            in {"queued", "processing"}
         )
 
     return {
         "status": "ok",
         "model": model_path.name,
         "classes": model.names,
-        "confidence_threshold": confidence_threshold,
+        "confidence_threshold": (
+            confidence_threshold
+        ),
         "active_jobs": active_jobs,
     }
 
 
-@app.post("/api/videos", status_code=202)
-async def upload_video(file: UploadFile = File(...)):
-    original_filename = file.filename or "uploaded-video"
-    extension = Path(original_filename).suffix.lower()
+@app.post(
+    "/api/videos",
+    status_code=202,
+)
+async def upload_video(
+    file: UploadFile = File(...)
+):
+    original_filename = (
+        file.filename or "uploaded-video"
+    )
+
+    extension = Path(
+        original_filename
+    ).suffix.lower()
 
     if extension not in allowed_video_extensions:
         raise HTTPException(
             status_code=400,
             detail=(
                 "Unsupported video format. "
-                "Use MP4, MOV, AVI, MKV, M4V, or WEBM."
+                "Use MP4, MOV, AVI, MKV, "
+                "M4V, or WEBM."
             ),
         )
 
     job_id = uuid.uuid4().hex
-    input_path = uploads_directory / f"{job_id}{extension}"
-    output_path = outputs_directory / f"{job_id}.mp4"
+
+    input_path = (
+        uploads_directory
+        / f"{job_id}{extension}"
+    )
+
+    output_path = (
+        outputs_directory
+        / f"{job_id}.mp4"
+    )
 
     uploaded_size = 0
 
     try:
         with input_path.open("wb") as destination:
-            while chunk := await file.read(1024 * 1024):
+            while chunk := await file.read(
+                1024 * 1024
+            ):
                 uploaded_size += len(chunk)
 
-                if uploaded_size > maximum_upload_size:
+                if (
+                    uploaded_size
+                    > maximum_upload_size
+                ):
                     raise HTTPException(
                         status_code=413,
-                        detail="The video exceeds the 2 GB limit.",
+                        detail=(
+                            "The video exceeds "
+                            "the 2 GB limit."
+                        ),
                     )
 
                 destination.write(chunk)
@@ -381,17 +492,25 @@ async def upload_video(file: UploadFile = File(...)):
             "job_id": job_id,
             "filename": original_filename,
             "uploaded_bytes": uploaded_size,
+            "created_at": time.time(),
             "status": "queued",
             "progress": 0,
-            "message": "Waiting to begin processing",
+            "message": (
+                "Waiting to begin processing"
+            ),
             "processed_frames": 0,
             "total_frames": 0,
             "frames_with_detections": 0,
             "total_detections": 0,
             "detection_events": [],
+            "review_summary": None,
             "input_path": str(input_path),
             "output_path": str(output_path),
         }
+
+        job_snapshot = dict(jobs[job_id])
+
+    job_store.write(job_id, job_snapshot)
 
     asyncio.create_task(
         process_video_in_background(
@@ -401,7 +520,22 @@ async def upload_video(file: UploadFile = File(...)):
         )
     )
 
-    return get_public_job(get_job_copy(job_id))
+    return get_public_job(
+        get_job_copy(job_id)
+    )
+
+
+@app.get("/api/jobs")
+async def list_jobs():
+    with jobs_lock:
+        all_jobs = [dict(job) for job in jobs.values()]
+
+    all_jobs.sort(
+        key=lambda job: job.get("created_at", 0),
+        reverse=True,
+    )
+
+    return [get_public_job(job) for job in all_jobs]
 
 
 @app.get("/api/jobs/{job_id}")
@@ -444,20 +578,100 @@ async def download_result(job_id: str):
     return FileResponse(
         path=output_path,
         media_type="video/mp4",
-        filename=f"bananaguard-{job_id}.mp4",
+        filename=(
+            f"bananaguard-{job_id}.mp4"
+        ),
+    )
+
+
+def extract_frame(input_path, frame_number):
+    video_capture = cv2.VideoCapture(str(input_path))
+
+    try:
+        if not video_capture.isOpened():
+            return None
+
+        video_capture.set(
+            cv2.CAP_PROP_POS_FRAMES,
+            frame_number,
+        )
+
+        success, frame = video_capture.read()
+
+        if not success or frame is None:
+            return None
+
+        encoded, buffer = cv2.imencode(".jpg", frame)
+
+        if not encoded:
+            return None
+
+        return buffer.tobytes()
+
+    finally:
+        video_capture.release()
+
+
+@app.get("/api/jobs/{job_id}/frames/{frame_number}")
+async def get_frame(job_id: str, frame_number: int):
+    if frame_number < 0:
+        raise HTTPException(
+            status_code=400,
+            detail="frame_number must be non-negative",
+        )
+
+    job = get_job_copy(job_id)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Job not found",
+        )
+
+    input_path = Path(job["input_path"])
+
+    if not input_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Source video is no longer available",
+        )
+
+    frame_bytes = await asyncio.to_thread(
+        extract_frame,
+        input_path,
+        frame_number,
+    )
+
+    if frame_bytes is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Frame not found",
+        )
+
+    return Response(
+        content=frame_bytes,
+        media_type="image/jpeg",
     )
 
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(
+    websocket: WebSocket
+):
     await websocket.accept()
     print("Webcam client connected")
 
     try:
         while True:
-            data = await websocket.receive_bytes()
+            data = (
+                await websocket.receive_bytes()
+            )
 
-            image_array = np.frombuffer(data, np.uint8)
+            image_array = np.frombuffer(
+                data,
+                np.uint8,
+            )
+
             image = cv2.imdecode(
                 image_array,
                 cv2.IMREAD_COLOR,
@@ -471,8 +685,13 @@ async def websocket_endpoint(websocket: WebSocket):
                 image,
             )
 
-            detections = serialize_detections(result)
-            await websocket.send_json(detections)
+            detections = serialize_detections(
+                result
+            )
+
+            await websocket.send_json(
+                detections
+            )
 
     except WebSocketDisconnect:
         print("Webcam client disconnected")
@@ -487,7 +706,10 @@ async def websocket_endpoint(websocket: WebSocket):
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
+    port = int(
+        os.environ.get("PORT", 8080)
+    )
+
     uvicorn.run(
         app,
         host="0.0.0.0",

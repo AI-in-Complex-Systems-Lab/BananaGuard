@@ -17,7 +17,7 @@ COPY webapp/backend/requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY webapp/backend/server.py .
+COPY webapp/backend/server.py webapp/backend/review_api.py webapp/backend/review_store.py .
 COPY yolo11.pt /models/yolo11.pt
 
 EXPOSE 8080

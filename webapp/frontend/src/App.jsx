@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import CompletedJobDetails from './CompletedJobDetails';
+import JobHistoryPanel from './JobHistoryPanel';
 
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || 'http://localhost:8081';
@@ -330,10 +332,6 @@ function UploadPanel() {
     setError('');
   }
 
-  const resultUrl = job?.result_url
-    ? `${API_BASE_URL}${job.result_url}`
-    : null;
-
   return (
     <section style={styles.uploadPanel}>
       <h2>Process a Video</h2>
@@ -410,72 +408,10 @@ function UploadPanel() {
           <p>{job.progress || 0}% complete</p>
 
           {job.status === 'completed' && (
-            <div style={styles.resultsBox}>
-              <h3>Detection Summary</h3>
-
-              <p>
-                <strong>Processed frames:</strong>{' '}
-                {job.processed_frames}
-              </p>
-
-              <p>
-                <strong>
-                  Frames containing detections:
-                </strong>{' '}
-                {job.frames_with_detections}
-              </p>
-
-              <p>
-                <strong>Total detections:</strong>{' '}
-                {job.total_detections}
-              </p>
-
-              {resultUrl && (
-                <>
-                  <video
-                    controls
-                    src={resultUrl}
-                    style={styles.resultVideo}
-                  />
-
-                  <p>
-                    <a
-                      href={resultUrl}
-                      download
-                      style={styles.downloadLink}
-                    >
-                      Download annotated video
-                    </a>
-                  </p>
-                </>
-              )}
-
-              {job.detection_events?.length > 0 && (
-                <div>
-                  <h3>Detection Timeline</h3>
-
-                  <div style={styles.timeline}>
-                    {job.detection_events
-                      .slice(0, 100)
-                      .map((event) => (
-                        <div
-                          key={`${event.frame}-${event.timestamp_seconds}`}
-                          style={styles.timelineItem}
-                        >
-                          <strong>
-                            {event.timestamp_seconds}s
-                          </strong>
-
-                          {' — '}
-
-                          {event.detections.length}{' '}
-                          detection(s)
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
-            </div>
+            <CompletedJobDetails
+              job={job}
+              apiBaseUrl={API_BASE_URL}
+            />
           )}
 
           {job.status === 'failed' && (
@@ -538,13 +474,23 @@ function App() {
         >
           Live Camera
         </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveView('history')}
+          style={
+            activeView === 'history'
+              ? styles.activeTab
+              : styles.tab
+          }
+        >
+          Job History
+        </button>
       </nav>
 
-      {activeView === 'upload' ? (
-        <UploadPanel />
-      ) : (
-        <WebcamPanel />
-      )}
+      {activeView === 'upload' && <UploadPanel />}
+      {activeView === 'webcam' && <WebcamPanel />}
+      {activeView === 'history' && <JobHistoryPanel />}
     </main>
   );
 }
@@ -699,35 +645,6 @@ const styles = {
     transition: 'width 0.3s ease',
   },
 
-  resultsBox: {
-    marginTop: '24px',
-    paddingTop: '18px',
-    borderTop: '1px solid #d9deea',
-  },
-
-  resultVideo: {
-    width: '100%',
-    maxWidth: '720px',
-    marginTop: '16px',
-    background: '#000000',
-  },
-
-  downloadLink: {
-    color: '#175cd3',
-    fontWeight: 600,
-  },
-
-  timeline: {
-    maxHeight: '280px',
-    overflowY: 'auto',
-    border: '1px solid #d9deea',
-    borderRadius: '8px',
-  },
-
-  timelineItem: {
-    padding: '10px 12px',
-    borderBottom: '1px solid #edf0f5',
-  },
 };
 
 
