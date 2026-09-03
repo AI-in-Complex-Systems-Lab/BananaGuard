@@ -7,7 +7,10 @@ services:
     runtime: docker
     dockerfilePath: webapp/backend/Dockerfile
     dockerContext: .
-    plan: starter
+    # Starter's 512MB RAM isn't enough to load torch + ultralytics +
+    # the YOLO11x-seg model without getting OOM-killed at startup.
+    # Standard (2GB) is the minimum that actually runs.
+    plan: standard
     healthCheckPath: /health
     disk:
       name: bananaguard-storage

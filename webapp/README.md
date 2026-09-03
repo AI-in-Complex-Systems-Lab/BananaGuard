@@ -115,9 +115,12 @@ Point them at wherever your backend is actually running.
    (or the login page's first-time-setup banner) and change the
    password immediately.
 
-Persistent disks require a paid instance plan (Render's Starter tier
-or above) — budget for that if this is headed toward real use rather
-than a throwaway demo.
+The backend needs Render's **Standard** plan (1 CPU / 2GB RAM,
+~$25/mo) at minimum — Starter's 512MB isn't enough to load torch +
+ultralytics + the YOLO11x-seg model without getting OOM-killed at
+startup. Persistent disks also require a paid plan on top of that.
+Budget for both if this is headed toward real use rather than a
+throwaway demo.
 
 ### Manual / other hosts
 
