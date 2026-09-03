@@ -42,8 +42,16 @@ app = FastAPI(title="BananaGuard API")
 
 server_directory = Path(__file__).resolve().parent
 default_model_path = (
-    server_directory.parent.parent / "yolo11.pt"
+    server_directory / "models" / "weapon_detection.pt"
 )
+
+if not default_model_path.exists():
+    # Fall back to the original stock model, e.g. for a clone that
+    # hasn't pulled the Git LFS-tracked weights yet.
+    default_model_path = (
+        server_directory.parent.parent / "yolo11.pt"
+    )
+
 model_path = Path(
     os.environ.get("MODEL_PATH", default_model_path)
 )

@@ -9,9 +9,15 @@ is gated by accounts with `admin` or `officer` roles.
 
 - Python 3.11+ (3.13 also works)
 - Node.js 20+
-- A YOLO weights file. By default the backend looks for `yolo11.pt`
-  in the repository root (two directories up from `backend/`); override
-  with `MODEL_PATH` if yours lives elsewhere.
+- [Git LFS](https://git-lfs.com/) — `backend/models/weapon_detection.pt`
+  is tracked via LFS (it's 124MB, over GitHub's normal push limit).
+  Run `git lfs install && git lfs pull` after cloning, or the backend
+  will silently fall back to the smaller, less accurate `yolo11.pt` at
+  the repo root.
+- A YOLO weights file. By default the backend looks for
+  `backend/models/weapon_detection.pt` (falling back to `yolo11.pt` in
+  the repository root if that's missing); override with `MODEL_PATH`
+  if yours lives elsewhere.
 
 ## Backend setup
 
@@ -39,7 +45,7 @@ password. That password is:
 | Variable | Default | Purpose |
 |---|---|---|
 | `PORT` | `8080` | Port the server listens on |
-| `MODEL_PATH` | `<repo root>/yolo11.pt` | Path to the YOLO weights file |
+| `MODEL_PATH` | `backend/models/weapon_detection.pt` (falls back to `<repo root>/yolo11.pt`) | Path to the YOLO weights file |
 | `CONFIDENCE_THRESHOLD` | `0.50` | Initial detection confidence threshold (admins can change this at runtime from the Settings page) |
 | `AUTH_SECRET_KEY` | auto-generated, persisted to `storage/auth_secret.key` | Secret used to sign session tokens. Set this explicitly in production so sessions survive a redeploy that wipes local storage. |
 | `STORAGE_DIR` | `backend/storage` | Where uploads, outputs, jobs, reviews, and users are persisted. Mainly useful for pointing tests at a temp directory. |
@@ -84,10 +90,11 @@ Point them at wherever your backend is actually running.
 
 Both `backend/Dockerfile` and `frontend/Dockerfile` build standalone
 images (the frontend one serves the built static files via Nginx,
-templated for Cloud Run's `$PORT`). Set `AUTH_SECRET_KEY` and
-`MODEL_PATH` explicitly for the backend container rather than relying
-on the auto-generated defaults, since container filesystems are
-typically ephemeral.
+templated for Cloud Run's `$PORT`). Set `AUTH_SECRET_KEY` explicitly
+for the backend container rather than relying on the auto-generated
+default, since container filesystems are typically ephemeral. Make
+sure `git lfs pull` has run before `docker build` — the model weights
+won't be present otherwise.
 
 ## Project layout
 
