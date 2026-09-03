@@ -88,13 +88,52 @@ Point them at wherever your backend is actually running.
 
 ## Deployment
 
-Both `backend/Dockerfile` and `frontend/Dockerfile` build standalone
-images (the frontend one serves the built static files via Nginx,
-templated for Cloud Run's `$PORT`). Set `AUTH_SECRET_KEY` explicitly
-for the backend container rather than relying on the auto-generated
-default, since container filesystems are typically ephemeral. Make
-sure `git lfs pull` has run before `docker build` — the model weights
-won't be present otherwise.
+### Render (recommended)
+
+`webapp/render.yaml` is a ready-to-use Render Blueprint:
+
+1. Push this repo to GitHub (already done for the main project repo).
+2. In Render, choose **New > Blueprint**, point it at this repo, and it
+   will provision two services from `webapp/render.yaml`:
+   - `bananaguard-backend` — the FastAPI app, built from
+     `backend/Dockerfile`, with a **persistent disk** mounted at
+     `/app/storage`. This is the important part: unlike Cloud Run,
+     Render's disks survive redeploys, so uploaded videos, job
+     history, reviews, and user accounts aren't wiped every time you
+     ship a change.
+   - `bananaguard-frontend` — the React app, deployed as a free static
+     site (built with `npm run build`, no Docker/Nginx needed for
+     this path).
+3. Once `bananaguard-backend` has deployed, copy its URL and set it on
+   the frontend service (Render dashboard > `bananaguard-frontend` >
+   Environment):
+   - `VITE_API_URL` = `https://<your-backend>.onrender.com`
+   - `VITE_WS_URL` = `wss://<your-backend>.onrender.com/ws`
+4. Redeploy the frontend service so the build picks up those values
+   (Vite inlines `VITE_*` vars at build time, not at runtime).
+5. Log in with the admin credentials from the backend's first-run logs
+   (or the login page's first-time-setup banner) and change the
+   password immediately.
+
+Persistent disks require a paid instance plan (Render's Starter tier
+or above) — budget for that if this is headed toward real use rather
+than a throwaway demo.
+
+### Manual / other hosts
+
+Both `backend/Dockerfile` and `frontend/Dockerfile` also build
+standalone images if you'd rather run this somewhere else (the
+frontend one serves the built static files via Nginx, templated for
+Cloud Run's `$PORT`). Whatever platform you use, make sure:
+
+- `AUTH_SECRET_KEY` is set explicitly and persisted, rather than
+  relying on the auto-generated default — otherwise every restart on
+  an ephemeral filesystem logs everyone out.
+- The backend's `storage/` directory is on a **persistent** volume,
+  not the container's own ephemeral filesystem. This is the mistake
+  that ruled out Cloud Run's default setup for this project.
+- `git lfs pull` has run before `docker build` — the model weights
+  won't be present otherwise.
 
 ## Project layout
 

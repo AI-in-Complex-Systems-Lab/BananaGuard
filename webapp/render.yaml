@@ -1,0 +1,46 @@
+services:
+  # FastAPI backend: runs from the existing Dockerfile, with a persistent
+  # disk mounted where the app stores users/jobs/reviews/uploads, so that
+  # data survives redeploys instead of being wiped like on Cloud Run.
+  - type: web
+    name: bananaguard-backend
+    runtime: docker
+    dockerfilePath: webapp/backend/Dockerfile
+    dockerContext: .
+    plan: starter
+    healthCheckPath: /health
+    disk:
+      name: bananaguard-storage
+      mountPath: /app/storage
+      sizeGB: 10
+    envVars:
+      # Render generates and persists this automatically. Without it,
+      # every restart would use a fresh auto-generated key and log
+      # everyone out.
+      - key: AUTH_SECRET_KEY
+        generateValue: true
+
+  # React frontend: built as a static site (free on Render, no Docker
+  # needed) instead of the nginx-based Dockerfile used for local/manual
+  # deployment.
+  - type: web
+    name: bananaguard-frontend
+    runtime: static
+    rootDir: webapp/frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      # Set these in the Render dashboard once the backend service has
+      # deployed and you know its URL, e.g.:
+      #   VITE_API_URL = https://bananaguard-backend.onrender.com
+      #   VITE_WS_URL  = wss://bananaguard-backend.onrender.com/ws
+      # Then trigger a redeploy of this service so the build picks
+      # them up (Vite inlines them at build time, not at runtime).
+      - key: VITE_API_URL
+        sync: false
+      - key: VITE_WS_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
