@@ -32,6 +32,7 @@ from auth import (
     require_admin,
 )
 from auth_api import auth_router
+from dataset_export import build_yolo_export
 from job_store import JobStore
 from review_api import review_router, review_store
 from user_store import UserStore
@@ -861,6 +862,157 @@ async def get_frame(
     return Response(
         content=frame_bytes,
         media_type="image/jpeg",
+    )
+
+
+def extract_frames_bulk(input_path, frame_numbers):
+    results = {}
+
+    video_capture = cv2.VideoCapture(str(input_path))
+
+    try:
+        if not video_capture.isOpened():
+            return results
+
+        for frame_number in sorted(frame_numbers):
+            video_capture.set(
+                cv2.CAP_PROP_POS_FRAMES,
+                frame_number,
+            )
+
+            success, frame = video_capture.read()
+
+            if not success or frame is None:
+                continue
+
+            encoded, buffer = cv2.imencode(
+                ".jpg", frame
+            )
+
+            if not encoded:
+                continue
+
+            results[frame_number] = buffer.tobytes()
+
+    finally:
+        video_capture.release()
+
+    return results
+
+
+def get_video_dimensions(input_path):
+    video_capture = cv2.VideoCapture(str(input_path))
+
+    try:
+        if not video_capture.isOpened():
+            return None
+
+        width = int(
+            video_capture.get(cv2.CAP_PROP_FRAME_WIDTH)
+        )
+
+        height = int(
+            video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        )
+
+        if width <= 0 or height <= 0:
+            return None
+
+        return width, height
+
+    finally:
+        video_capture.release()
+
+
+@app.get("/api/jobs/{job_id}/export")
+async def export_dataset(
+    job_id: str,
+    current_user: dict = Depends(
+        get_current_user_flexible
+    ),
+):
+    job = get_job_copy(job_id)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Job not found",
+        )
+
+    records = review_store.list(job_id)
+
+    if records is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Review data was not found",
+        )
+
+    input_path = Path(job["input_path"])
+
+    if not input_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Source video is no longer available",
+        )
+
+    dimensions = await asyncio.to_thread(
+        get_video_dimensions, input_path
+    )
+
+    if dimensions is None:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to read source video dimensions",
+        )
+
+    frame_width, frame_height = dimensions
+
+    exportable_frame_numbers = {
+        record["frame"]
+        for record in records
+        if record["status"]
+        in {"approved", "corrected"}
+    }
+
+    frame_images = await asyncio.to_thread(
+        extract_frames_bulk,
+        input_path,
+        exportable_frame_numbers,
+    )
+
+    (
+        zip_bytes,
+        included_frames,
+        included_detections,
+    ) = build_yolo_export(
+        records,
+        frame_width,
+        frame_height,
+        frame_images,
+    )
+
+    if zip_bytes is None:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "No approved or corrected detections "
+                "are available to export yet"
+            ),
+        )
+
+    return Response(
+        content=zip_bytes,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": (
+                "attachment; filename="
+                f'"bananaguard-dataset-{job_id}.zip"'
+            ),
+            "X-Exported-Frames": str(included_frames),
+            "X-Exported-Detections": str(
+                included_detections
+            ),
+        },
     )
 
 

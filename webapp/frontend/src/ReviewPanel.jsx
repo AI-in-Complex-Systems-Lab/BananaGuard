@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { authFetch } from './api';
+import { authFetch, mediaUrl } from './api';
 import { useAuth } from './AuthContext';
 import BoxCorrectionModal from './BoxCorrectionModal';
 
@@ -172,6 +172,8 @@ function ReviewPanel({ jobId }) {
   }
 
   const { summary } = reviewData;
+  const exportableCount =
+    summary.approved + summary.corrected;
 
   return (
     <section style={styles.panel}>
@@ -193,18 +195,49 @@ function ReviewPanel({ jobId }) {
           </p>
         </div>
 
-        <select
-          value={filter}
-          onChange={changeFilter}
-          className="text-input"
-          style={{ maxWidth: 200 }}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+            alignItems: 'flex-end',
+          }}
         >
-          <option value="all">All detections</option>
-          <option value="pending">Pending</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-          <option value="corrected">Corrected</option>
-        </select>
+          <select
+            value={filter}
+            onChange={changeFilter}
+            className="text-input"
+            style={{ maxWidth: 200 }}
+          >
+            <option value="all">All detections</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="corrected">Corrected</option>
+          </select>
+
+          {exportableCount > 0 ? (
+            <a
+              href={mediaUrl(
+                `/api/jobs/${jobId}/export`,
+                token
+              )}
+              className="btn btn-sm"
+            >
+              Export Dataset (YOLO) — {exportableCount}
+            </a>
+          ) : (
+            <span
+              style={{
+                fontSize: 12,
+                color: 'var(--text-muted)',
+              }}
+            >
+              Approve or correct detections to enable
+              export
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="stat-grid">

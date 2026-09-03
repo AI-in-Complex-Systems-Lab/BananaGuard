@@ -1,4 +1,6 @@
+import io
 import time
+import zipfile
 
 
 def test_health(client):
@@ -285,6 +287,140 @@ def test_full_video_pipeline(
 
     assert dashboard_response.status_code == 200
     assert dashboard_response.json()["totals"]["jobs"] >= 1
+
+    # this job has zero detections, so nothing is exportable yet
+    export_response = client.get(
+        f"/api/jobs/{job_id}/export",
+        headers=admin_auth_headers,
+    )
+
+    assert export_response.status_code == 400
+
+
+def test_export_dataset_returns_yolo_zip(
+    client, admin_auth_headers, server_module, tiny_video_bytes
+):
+    upload_response = client.post(
+        "/api/videos",
+        headers=admin_auth_headers,
+        files={
+            "file": (
+                "export-clip.mp4",
+                tiny_video_bytes,
+                "video/mp4",
+            )
+        },
+    )
+
+    assert upload_response.status_code == 202
+    job_id = upload_response.json()["job_id"]
+
+    for _ in range(60):
+        status_response = client.get(
+            f"/api/jobs/{job_id}",
+            headers=admin_auth_headers,
+        )
+
+        if status_response.json()["status"] == "completed":
+            break
+
+        time.sleep(0.5)
+    else:
+        raise AssertionError("job never completed")
+
+    # the synthetic clip has no real detections; seed some
+    # directly so there is something to review and export
+    server_module.review_store.initialize(
+        job_id,
+        [
+            {
+                "frame": 0,
+                "timestamp_seconds": 0.0,
+                "detections": [
+                    {
+                        "label": "gun",
+                        "score": 0.9,
+                        "box": [5, 5, 20, 20],
+                    }
+                ],
+            },
+            {
+                "frame": 2,
+                "timestamp_seconds": 0.2,
+                "detections": [
+                    {
+                        "label": "gun",
+                        "score": 0.4,
+                        "box": [1, 1, 5, 5],
+                    }
+                ],
+            },
+        ],
+    )
+
+    approve_response = client.patch(
+        f"/api/jobs/{job_id}/reviews/0-0",
+        headers=admin_auth_headers,
+        json={"status": "approved"},
+    )
+    assert approve_response.status_code == 200
+
+    reject_response = client.patch(
+        f"/api/jobs/{job_id}/reviews/2-0",
+        headers=admin_auth_headers,
+        json={"status": "rejected"},
+    )
+    assert reject_response.status_code == 200
+
+    # rejected detections must not appear in the export
+    export_response = client.get(
+        f"/api/jobs/{job_id}/export",
+        headers=admin_auth_headers,
+    )
+
+    assert export_response.status_code == 200
+    assert (
+        export_response.headers["content-type"]
+        == "application/zip"
+    )
+    assert export_response.headers["x-exported-frames"] == "1"
+    assert (
+        export_response.headers["x-exported-detections"]
+        == "1"
+    )
+
+    with zipfile.ZipFile(
+        io.BytesIO(export_response.content)
+    ) as archive:
+        names = set(archive.namelist())
+
+        assert "images/frame_0.jpg" in names
+        assert "labels/frame_0.txt" in names
+        assert "images/frame_2.jpg" not in names
+        assert "classes.txt" in names
+        assert (
+            archive.read("classes.txt").decode("utf-8")
+            == "gun\n"
+        )
+
+
+def test_export_requires_auth(client):
+    response = client.get(
+        "/api/jobs/does-not-exist/export"
+    )
+
+    assert response.status_code == 401
+
+
+def test_export_unknown_job_returns_404(
+    client, admin_auth_headers
+):
+    response = client.get(
+        "/api/jobs/does-not-exist/export",
+        headers=admin_auth_headers,
+    )
+
+    assert response.status_code == 404
 
 
 def test_job_not_found(client, admin_auth_headers):

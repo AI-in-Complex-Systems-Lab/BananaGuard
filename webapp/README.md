@@ -101,6 +101,7 @@ webapp/
     job_store.py      Persists job metadata across restarts
     review_api.py     Detection review endpoints (approve/reject/correct)
     review_store.py   Persists review state per job
+    dataset_export.py Builds a YOLO-format dataset zip from approved/corrected reviews
     tests/            pytest suite
   frontend/
     src/
