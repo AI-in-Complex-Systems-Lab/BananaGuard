@@ -90,11 +90,11 @@ Point them at wherever your backend is actually running.
 
 ### Render (recommended)
 
-`webapp/render.yaml` is a ready-to-use Render Blueprint:
+`render.yaml` (repo root) is a ready-to-use Render Blueprint:
 
 1. Push this repo to GitHub (already done for the main project repo).
 2. In Render, choose **New > Blueprint**, point it at this repo, and it
-   will provision two services from `webapp/render.yaml`:
+   will provision two services from `render.yaml` (repo root):
    - `bananaguard-backend` — the FastAPI app, built from
      `backend/Dockerfile`, with a **persistent disk** mounted at
      `/app/storage`. This is the important part: unlike Cloud Run,
