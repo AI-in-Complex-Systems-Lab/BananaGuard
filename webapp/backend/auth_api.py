@@ -25,20 +25,6 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
 
-@auth_router.get("/bootstrap-hint")
-async def bootstrap_hint():
-    credentials = get_auth_service().read_bootstrap_credentials()
-
-    if credentials is None:
-        return {"available": False}
-
-    return {
-        "available": True,
-        "username": credentials["username"],
-        "password": credentials["password"],
-    }
-
-
 @auth_router.post("/login")
 async def login(request: LoginRequest):
     auth_service = get_auth_service()

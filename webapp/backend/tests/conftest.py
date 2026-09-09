@@ -36,15 +36,16 @@ def client(app):
 
 
 @pytest.fixture(scope="session")
-def admin_credentials(client):
-    response = client.get("/api/auth/bootstrap-hint")
-    data = response.json()
+def admin_credentials(server_module):
+    credentials = (
+        server_module.auth_module.auth_service.read_bootstrap_credentials()
+    )
 
-    assert data["available"] is True
+    assert credentials is not None
 
     return {
-        "username": data["username"],
-        "password": data["password"],
+        "username": credentials["username"],
+        "password": credentials["password"],
     }
 
 

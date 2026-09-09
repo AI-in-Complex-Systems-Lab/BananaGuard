@@ -35,8 +35,10 @@ exist yet, it creates a default `admin` account with a random
 password. That password is:
 
 - printed to the server's console output, and
-- written to `storage/admin_bootstrap.txt`, and
-- shown directly on the login page until the admin password is changed.
+- written to `storage/admin_bootstrap.txt`.
+
+Only someone with server/log access can read it — it is never exposed
+over the API or shown on the login page.
 
 **Change that password before deploying anywhere real.**
 
@@ -112,7 +114,7 @@ Point them at wherever your backend is actually running.
 4. Redeploy the frontend service so the build picks up those values
    (Vite inlines `VITE_*` vars at build time, not at runtime).
 5. Log in with the admin credentials from the backend's first-run logs
-   (or the login page's first-time-setup banner) and change the
+   (Render dashboard > `bananaguard-backend` > Logs) and change the
    password immediately.
 
 The backend needs Render's **Standard** plan (1 CPU / 2GB RAM,
