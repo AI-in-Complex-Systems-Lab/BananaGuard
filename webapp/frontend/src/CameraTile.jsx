@@ -1,3 +1,7 @@
+import { useEffect } from 'react';
+import useDetectionCamera from './useDetectionCamera';
+
+
 function StatusDot({ live }) {
   return (
     <span
@@ -8,22 +12,33 @@ function StatusDot({ live }) {
 }
 
 /**
- * One tile in the video-view grid. `camera.kind === 'browser'` is the
- * platform's one real, wired-up feed (this device's webcam, run
- * through live detection); every other kind is a placeholder for a
- * camera source that doesn't exist yet — real multi-camera ingestion
- * (RTSP/IP cameras) is future work, not built here.
+ * One tile in the video-view grid. `camera.kind === 'browser'` is a
+ * real, browser-visible camera on this machine (the built-in webcam,
+ * or a specific USB camera by deviceId) — each such tile runs its own
+ * independent detection feed. Every other kind is a placeholder for a
+ * camera source that doesn't exist yet — real IP/RTSP camera
+ * ingestion is future work, not built here.
+ *
+ * useDetectionCamera is called unconditionally (rules of hooks), even
+ * for placeholder tiles; it just never starts for those.
  */
 function CameraTile({
   camera,
   focused,
   onFocus,
-  liveCamera,
+  onLiveChange,
 }) {
   const isBrowserCamera = camera.kind === 'browser';
+  const liveCamera = useDetectionCamera(
+    isBrowserCamera ? camera.deviceId : undefined
+  );
   const { refs, state, start, stop } = liveCamera;
   const { video: videoRef, canvas: canvasRef } = refs;
   const isLive = isBrowserCamera && state.isRunning;
+
+  useEffect(() => {
+    onLiveChange?.(camera.id, isLive);
+  }, [camera.id, isLive, onLiveChange]);
 
   return (
     <div

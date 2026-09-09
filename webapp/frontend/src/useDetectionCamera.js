@@ -33,14 +33,13 @@ function drawBoxes(canvas, detections) {
 
 
 /**
- * Captures the browser's own webcam, streams frames to the detection
- * WebSocket, and draws returned bounding boxes onto a canvas. Extracted
- * from the original single-camera WebcamPanel so it can be embedded in
- * any camera tile — this is the platform's only real, currently-wired
- * camera source; every other tile in the video-view grid is a
- * placeholder until real camera ingestion is built.
+ * Captures one browser-visible camera (this device's webcam, or a
+ * specific USB camera by deviceId), streams frames to the detection
+ * WebSocket, and draws returned bounding boxes onto a canvas. Each
+ * camera tile gets its own instance of this hook, so multiple cameras
+ * plugged into the same machine can each run detection independently.
  */
-function useDetectionCamera() {
+function useDetectionCamera(deviceId) {
   const { token } = useAuth();
 
   const videoRef = useRef(null);
@@ -48,6 +47,7 @@ function useDetectionCamera() {
   const socketRef = useRef(null);
   const streamRef = useRef(null);
   const sendIntervalRef = useRef(null);
+  const deviceIdRef = useRef(deviceId);
   const reconnectTimeoutRef = useRef(null);
   const reconnectDelayRef = useRef(RECONNECT_INITIAL_DELAY_MS);
   const isRunningRef = useRef(false);
@@ -59,6 +59,7 @@ function useDetectionCamera() {
   const [lastDetections, setLastDetections] = useState([]);
 
   tokenRef.current = token;
+  deviceIdRef.current = deviceId;
 
   function stopSendLoop() {
     if (sendIntervalRef.current) {
@@ -233,8 +234,16 @@ function useDetectionCamera() {
     setStatus('Requesting camera access...');
 
     try {
+      const requestedDeviceId = deviceIdRef.current;
+
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 480 },
+        video: {
+          width: 640,
+          height: 480,
+          ...(requestedDeviceId
+            ? { deviceId: { exact: requestedDeviceId } }
+            : {}),
+        },
         audio: false,
       });
 
