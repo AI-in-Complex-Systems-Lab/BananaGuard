@@ -4,7 +4,7 @@ import LoginPage from './LoginPage';
 import AppShell from './AppShell';
 import DashboardPage from './DashboardPage';
 import UploadPanel from './UploadPanel';
-import WebcamPanel from './WebcamPanel';
+import VideoViewPage from './VideoViewPage';
 import JobHistoryPanel from './JobHistoryPanel';
 import UsersAdminPage from './UsersAdminPage';
 import SettingsPage from './SettingsPage';
@@ -41,7 +41,7 @@ function AuthenticatedApp({ user }) {
 
       {activeView === 'upload' && <UploadPanel />}
 
-      {activeView === 'webcam' && <WebcamPanel />}
+      {activeView === 'webcam' && <VideoViewPage />}
 
       {activeView === 'history' && (
         <JobHistoryPanel

@@ -4,7 +4,7 @@ import { useAuth } from './AuthContext';
 const NAV_ITEMS = [
   { key: 'dashboard', icon: '▤', label: 'Dashboard' },
   { key: 'upload', icon: '↑', label: 'Process Video' },
-  { key: 'webcam', icon: '●', label: 'Live Camera' },
+  { key: 'webcam', icon: '▦', label: 'Video View' },
   { key: 'history', icon: '≡', label: 'Job History' },
 ];
 
@@ -16,7 +16,7 @@ const ADMIN_NAV_ITEMS = [
 const VIEW_TITLES = {
   dashboard: 'Dashboard',
   upload: 'Process a Video',
-  webcam: 'Live Camera',
+  webcam: 'Video View',
   history: 'Job History',
   admin: 'User Management',
   settings: 'Settings',

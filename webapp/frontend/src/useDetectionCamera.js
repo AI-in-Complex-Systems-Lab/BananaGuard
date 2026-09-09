@@ -12,12 +12,7 @@ function drawBoxes(canvas, detections) {
 
   const context = canvas.getContext('2d');
 
-  context.clearRect(
-    0,
-    0,
-    canvas.width,
-    canvas.height
-  );
+  context.clearRect(0, 0, canvas.width, canvas.height);
 
   detections.forEach((detection) => {
     const [x, y, width, height] = detection.box;
@@ -37,22 +32,15 @@ function drawBoxes(canvas, detections) {
 }
 
 
-function bannerClassName(connectionState) {
-  if (connectionState === 'connected') return 'info-banner';
-  if (connectionState === 'error') return 'error-banner';
-
-  if (
-    connectionState === 'connecting' ||
-    connectionState === 'reconnecting'
-  ) {
-    return 'warning-banner';
-  }
-
-  return 'info-banner';
-}
-
-
-function WebcamPanel() {
+/**
+ * Captures the browser's own webcam, streams frames to the detection
+ * WebSocket, and draws returned bounding boxes onto a canvas. Extracted
+ * from the original single-camera WebcamPanel so it can be embedded in
+ * any camera tile — this is the platform's only real, currently-wired
+ * camera source; every other tile in the video-view grid is a
+ * placeholder until real camera ingestion is built.
+ */
+function useDetectionCamera() {
   const { token } = useAuth();
 
   const videoRef = useRef(null);
@@ -61,18 +49,14 @@ function WebcamPanel() {
   const streamRef = useRef(null);
   const sendIntervalRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
-  const reconnectDelayRef = useRef(
-    RECONNECT_INITIAL_DELAY_MS
-  );
+  const reconnectDelayRef = useRef(RECONNECT_INITIAL_DELAY_MS);
   const isRunningRef = useRef(false);
   const tokenRef = useRef(token);
 
   const [isRunning, setIsRunning] = useState(false);
-  const [connectionState, setConnectionState] =
-    useState('idle');
-  const [status, setStatus] = useState(
-    'Camera is stopped.'
-  );
+  const [connectionState, setConnectionState] = useState('idle');
+  const [status, setStatus] = useState('Camera is stopped.');
+  const [lastDetections, setLastDetections] = useState([]);
 
   tokenRef.current = token;
 
@@ -98,24 +82,18 @@ function WebcamPanel() {
         return;
       }
 
-      if (
-        !video ||
-        video.readyState !== 4 ||
-        video.paused
-      ) {
+      if (!video || video.readyState !== 4 || video.paused) {
         return;
       }
 
-      const temporaryCanvas =
-        document.createElement('canvas');
+      const temporaryCanvas = document.createElement('canvas');
 
       temporaryCanvas.width = 640;
       temporaryCanvas.height = 480;
 
-      const context = temporaryCanvas.getContext(
-        '2d',
-        { willReadFrequently: true }
-      );
+      const context = temporaryCanvas.getContext('2d', {
+        willReadFrequently: true,
+      });
 
       context.drawImage(
         video,
@@ -131,8 +109,7 @@ function WebcamPanel() {
 
           if (
             blob &&
-            activeSocket?.readyState ===
-              WebSocket.OPEN &&
+            activeSocket?.readyState === WebSocket.OPEN &&
             activeSocket.bufferedAmount === 0
           ) {
             activeSocket.send(blob);
@@ -145,20 +122,15 @@ function WebcamPanel() {
   }
 
   function connectSocket() {
-    const websocket = new WebSocket(
-      websocketUrl(tokenRef.current)
-    );
+    const websocket = new WebSocket(websocketUrl(tokenRef.current));
 
     socketRef.current = websocket;
 
     websocket.onopen = () => {
-      reconnectDelayRef.current =
-        RECONNECT_INITIAL_DELAY_MS;
+      reconnectDelayRef.current = RECONNECT_INITIAL_DELAY_MS;
 
       setConnectionState('connected');
-      setStatus(
-        'Connected. Watching for firearms...'
-      );
+      setStatus('Connected. Watching for firearms...');
 
       startSendLoop();
     };
@@ -167,14 +139,12 @@ function WebcamPanel() {
       try {
         const detections = JSON.parse(event.data);
 
+        setLastDetections(detections);
+
         if (detections.length > 0) {
-          setStatus(
-            `Alert: ${detections.length} gun detection(s)`
-          );
+          setStatus(`Alert: ${detections.length} gun detection(s)`);
         } else {
-          setStatus(
-            'Camera active — no gun detected'
-          );
+          setStatus('Camera active — no gun detected');
         }
 
         drawBoxes(canvasRef.current, detections);
@@ -245,10 +215,7 @@ function WebcamPanel() {
       socket.close();
     }
 
-    streamRef.current
-      ?.getTracks()
-      .forEach((track) => track.stop());
-
+    streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
 
     if (videoRef.current) {
@@ -256,28 +223,23 @@ function WebcamPanel() {
     }
   }
 
-  async function handleStart() {
+  async function start() {
     if (isRunningRef.current) return;
 
     isRunningRef.current = true;
     setIsRunning(true);
-    reconnectDelayRef.current =
-      RECONNECT_INITIAL_DELAY_MS;
+    reconnectDelayRef.current = RECONNECT_INITIAL_DELAY_MS;
     setConnectionState('connecting');
     setStatus('Requesting camera access...');
 
     try {
-      const stream =
-        await navigator.mediaDevices.getUserMedia({
-          video: { width: 640, height: 480 },
-          audio: false,
-        });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 640, height: 480 },
+        audio: false,
+      });
 
       if (!isRunningRef.current) {
-        stream.getTracks().forEach((track) =>
-          track.stop()
-        );
-
+        stream.getTracks().forEach((track) => track.stop());
         return;
       }
 
@@ -289,10 +251,7 @@ function WebcamPanel() {
 
       connectSocket();
     } catch (error) {
-      console.error(
-        'Unable to start camera:',
-        error
-      );
+      console.error('Unable to start camera:', error);
 
       setStatus(`Camera error: ${error.message}`);
       setConnectionState('error');
@@ -302,11 +261,12 @@ function WebcamPanel() {
     }
   }
 
-  function handleStop() {
+  function stop() {
     isRunningRef.current = false;
     setIsRunning(false);
     setConnectionState('idle');
     setStatus('Camera is stopped.');
+    setLastDetections([]);
     cleanupResources();
   }
 
@@ -318,117 +278,13 @@ function WebcamPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return (
-    <div>
-      <div className="page-header">
-        <h2 className="page-title">Live Camera</h2>
-
-        <p className="page-subtitle">
-          Real-time firearm detection from a connected
-          camera feed.
-        </p>
-      </div>
-
-      <div
-        className={bannerClassName(connectionState)}
-        style={{
-          marginBottom: 20,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 16,
-          flexWrap: 'wrap',
-        }}
-      >
-        <span>
-          <strong>Status:</strong> {status}
-        </span>
-
-        <button
-          type="button"
-          className={
-            isRunning ? 'btn btn-danger' : 'btn btn-primary'
-          }
-          onClick={isRunning ? handleStop : handleStart}
-        >
-          {isRunning ? 'Stop Camera' : 'Start Camera'}
-        </button>
-      </div>
-
-      <div
-        className="card"
-        style={{
-          padding: 16,
-          width: 'fit-content',
-        }}
-      >
-        <div style={styles.videoContainer}>
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            style={styles.video}
-          />
-
-          <canvas
-            ref={canvasRef}
-            width="640"
-            height="480"
-            style={styles.canvas}
-          />
-
-          {!isRunning && (
-            <div style={styles.placeholder}>
-              Camera is stopped
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  return {
+    refs: { video: videoRef, canvas: canvasRef },
+    state: { isRunning, connectionState, status, lastDetections },
+    start,
+    stop,
+  };
 }
 
 
-const styles = {
-  videoContainer: {
-    position: 'relative',
-    width: '640px',
-    height: '480px',
-    maxWidth: '100%',
-    background: '#000000',
-    borderRadius: 'var(--radius-md)',
-    overflow: 'hidden',
-  },
-
-  video: {
-    position: 'absolute',
-    inset: 0,
-    width: '640px',
-    height: '480px',
-    maxWidth: '100%',
-  },
-
-  canvas: {
-    position: 'absolute',
-    inset: 0,
-    zIndex: 10,
-    width: '640px',
-    height: '480px',
-    maxWidth: '100%',
-  },
-
-  placeholder: {
-    position: 'absolute',
-    inset: 0,
-    zIndex: 5,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: 'var(--text-muted)',
-    fontSize: 14,
-  },
-};
-
-
-export default WebcamPanel;
+export default useDetectionCamera;
