@@ -3,9 +3,10 @@ import { useAuth } from './AuthContext';
 
 const NAV_ITEMS = [
   { key: 'dashboard', icon: '▤', label: 'Dashboard' },
-  { key: 'upload', icon: '↑', label: 'Process Video' },
-  { key: 'webcam', icon: '▦', label: 'Video View' },
-  { key: 'history', icon: '≡', label: 'Job History' },
+  { key: 'live-cameras', icon: '▦', label: 'Live Cameras' },
+  { key: 'video-analysis', icon: '↑', label: 'Video Analysis' },
+  { key: 'detection-events', icon: '≡', label: 'Detection Events' },
+  { key: 'event-review', icon: '✓', label: 'Event Review' },
 ];
 
 const ADMIN_NAV_ITEMS = [
@@ -15,9 +16,10 @@ const ADMIN_NAV_ITEMS = [
 
 const VIEW_TITLES = {
   dashboard: 'Dashboard',
-  upload: 'Process a Video',
-  webcam: 'Video View',
-  history: 'Job History',
+  'live-cameras': 'Live Cameras',
+  'video-analysis': 'Video Analysis',
+  'detection-events': 'Detection Events',
+  'event-review': 'Event Review',
   admin: 'User Management',
   settings: 'Settings',
 };

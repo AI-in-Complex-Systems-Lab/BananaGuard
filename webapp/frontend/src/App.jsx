@@ -3,9 +3,10 @@ import { useAuth } from './AuthContext';
 import LoginPage from './LoginPage';
 import AppShell from './AppShell';
 import DashboardPage from './DashboardPage';
-import UploadPanel from './UploadPanel';
 import VideoViewPage from './VideoViewPage';
-import JobHistoryPanel from './JobHistoryPanel';
+import VideoAnalysisPage from './VideoAnalysisPage';
+import DetectionEventsPage from './DetectionEventsPage';
+import EventReviewPage from './EventReviewPage';
 import UsersAdminPage from './UsersAdminPage';
 import SettingsPage from './SettingsPage';
 
@@ -17,17 +18,29 @@ function AuthenticatedApp({ user }) {
   const [focusedJobId, setFocusedJobId] =
     useState(null);
 
+  const [focusedReviewJobId, setFocusedReviewJobId] =
+    useState(null);
+
   function handleNavigate(view) {
     setActiveView(view);
 
-    if (view !== 'history') {
+    if (view !== 'video-analysis') {
       setFocusedJobId(null);
+    }
+
+    if (view !== 'event-review') {
+      setFocusedReviewJobId(null);
     }
   }
 
   function handleOpenJob(jobId) {
     setFocusedJobId(jobId);
-    setActiveView('history');
+    setActiveView('video-analysis');
+  }
+
+  function handleOpenReview(jobId) {
+    setFocusedReviewJobId(jobId);
+    setActiveView('event-review');
   }
 
   return (
@@ -39,14 +52,21 @@ function AuthenticatedApp({ user }) {
         <DashboardPage onOpenJob={handleOpenJob} />
       )}
 
-      {activeView === 'upload' && <UploadPanel />}
+      {activeView === 'live-cameras' && <VideoViewPage />}
 
-      {activeView === 'webcam' && <VideoViewPage />}
-
-      {activeView === 'history' && (
-        <JobHistoryPanel
+      {activeView === 'video-analysis' && (
+        <VideoAnalysisPage
+          initialTab={focusedJobId ? 'history' : 'upload'}
           initialSelectedJobId={focusedJobId}
         />
+      )}
+
+      {activeView === 'detection-events' && (
+        <DetectionEventsPage onOpenReview={handleOpenReview} />
+      )}
+
+      {activeView === 'event-review' && (
+        <EventReviewPage initialJobId={focusedReviewJobId} />
       )}
 
       {activeView === 'admin' &&

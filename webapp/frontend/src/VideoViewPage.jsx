@@ -83,7 +83,7 @@ function VideoViewPage() {
     <div className="video-view">
       <div className="video-view-header">
         <div>
-          <h2 className="page-title">Video View</h2>
+          <h2 className="page-title">Live Cameras</h2>
 
           <p className="page-subtitle">
             {liveCount} of {cameras.length} cameras live &middot;{' '}
