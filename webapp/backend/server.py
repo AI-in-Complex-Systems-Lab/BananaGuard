@@ -20,7 +20,6 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
-from ultralytics import YOLO
 
 import auth as auth_module
 from auth import (
@@ -33,6 +32,7 @@ from auth import (
 )
 from auth_api import auth_router
 from dataset_export import build_yolo_export
+from detectors import YoloDetector
 from job_store import JobStore
 from review_api import review_router, review_store
 from user_store import UserStore
@@ -108,9 +108,8 @@ allowed_video_extensions = {
     ".webm",
 }
 
-model = YOLO(str(model_path))
+detector = YoloDetector(model_path)
 
-model_lock = threading.Lock()
 jobs_lock = threading.Lock()
 
 job_store = JobStore(jobs_directory)
@@ -204,43 +203,6 @@ def get_public_job(job):
         for key, value in job.items()
         if key not in {"input_path", "output_path"}
     }
-
-
-def run_inference(image):
-    with model_lock:
-        results = model(
-            image,
-            verbose=False,
-            conf=get_confidence_threshold(),
-        )
-
-    return results[0]
-
-
-def serialize_detections(result):
-    detections = []
-
-    for box in result.boxes:
-        x1, y1, x2, y2 = box.xyxy[0].tolist()
-
-        confidence = float(box.conf[0])
-        class_id = int(box.cls[0])
-        label = result.names[class_id]
-
-        detections.append(
-            {
-                "label": label,
-                "score": round(confidence, 4),
-                "box": [
-                    round(x1, 2),
-                    round(y1, 2),
-                    round(x2 - x1, 2),
-                    round(y2 - y1, 2),
-                ],
-            }
-        )
-
-    return detections
 
 
 def draw_detections(frame, detections):
@@ -357,9 +319,9 @@ def process_video(job_id, input_path, output_path):
             if not success or frame is None:
                 break
 
-            result = run_inference(frame)
-            detections = serialize_detections(
-                result
+            detections = detector.detect(
+                frame,
+                confidence_threshold=get_confidence_threshold(),
             )
 
             if detections:
@@ -503,7 +465,8 @@ async def health():
     return {
         "status": "ok",
         "model": model_path.name,
-        "classes": model.names,
+        "classes": detector.names,
+        "detector_type": detector.detector_type,
         "confidence_threshold": (
             get_confidence_threshold()
         ),
@@ -1062,13 +1025,10 @@ async def websocket_endpoint(
             if image is None:
                 continue
 
-            result = await asyncio.to_thread(
-                run_inference,
+            detections = await asyncio.to_thread(
+                detector.detect,
                 image,
-            )
-
-            detections = serialize_detections(
-                result
+                confidence_threshold=get_confidence_threshold(),
             )
 
             await websocket.send_json(
