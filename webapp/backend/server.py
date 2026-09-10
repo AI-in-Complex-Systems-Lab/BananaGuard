@@ -32,7 +32,7 @@ from auth import (
 )
 from auth_api import auth_router
 from dataset_export import build_yolo_export
-from detectors import YoloDetector
+from detectors import create_detector
 from job_store import JobStore
 from review_api import review_router, review_store
 from user_store import UserStore
@@ -108,7 +108,13 @@ allowed_video_extensions = {
     ".webm",
 }
 
-detector = YoloDetector(model_path)
+# "yolo" unless DETECTOR_TYPE is explicitly overridden — production
+# never sets this, so it always gets YoloDetector exactly as before.
+# Selecting "grounding_dino" here is not yet wired to any live
+# inference path (see backend/detectors/grounding_dino_detector.py);
+# this only makes the backend capable of constructing it.
+DETECTOR_TYPE = os.environ.get("DETECTOR_TYPE", "yolo")
+detector = create_detector(DETECTOR_TYPE, model_path=model_path)
 
 jobs_lock = threading.Lock()
 

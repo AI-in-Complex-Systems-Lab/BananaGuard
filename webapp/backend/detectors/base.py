@@ -1,6 +1,16 @@
 from abc import ABC, abstractmethod
 
 
+class DetectorUnavailableError(Exception):
+    """
+    Raised when a requested detector cannot be constructed — e.g. its
+    optional dependencies (transformers/torch) aren't installed, or it
+    requires a GPU that isn't available. Callers should catch this and
+    fail the specific request/selection clearly, rather than letting a
+    deep ImportError/CUDA stack trace take down the process.
+    """
+
+
 class Detector(ABC):
     """
     Common interface every object detector on this platform implements,

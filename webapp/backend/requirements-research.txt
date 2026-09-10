@@ -1,0 +1,13 @@
+-r requirements.txt
+
+# Optional dependencies for GroundingDinoDetector (backend/detectors/
+# grounding_dino_detector.py). NOT installed in production — the
+# production Dockerfile only ever runs `pip install -r requirements.txt`,
+# and create_detector() only imports this detector's module (and
+# therefore only needs these packages) when DETECTOR_TYPE=grounding_dino
+# is explicitly requested, which production never does.
+#
+# torch is already pulled in transitively by ultralytics in
+# requirements.txt; transformers/pillow are the actual additions.
+transformers
+pillow
