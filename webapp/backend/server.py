@@ -1,4 +1,5 @@
 import asyncio
+import math
 import os
 import threading
 import time
@@ -12,6 +13,7 @@ from fastapi import (
     Depends,
     FastAPI,
     File,
+    Form,
     HTTPException,
     UploadFile,
     WebSocket,
@@ -32,7 +34,7 @@ from auth import (
 )
 from auth_api import auth_router
 from dataset_export import build_yolo_export
-from detectors import create_detector
+from detectors import AVAILABLE_DETECTOR_TYPES, DetectorUnavailableError, create_detector
 from job_store import JobStore
 from review_api import review_router, review_store
 from user_store import UserStore
@@ -110,11 +112,33 @@ allowed_video_extensions = {
 
 # "yolo" unless DETECTOR_TYPE is explicitly overridden — production
 # never sets this, so it always gets YoloDetector exactly as before.
-# Selecting "grounding_dino" here is not yet wired to any live
-# inference path (see backend/detectors/grounding_dino_detector.py);
-# this only makes the backend capable of constructing it.
+# This is the detector the /ws live-camera path always uses; live
+# camera has no per-request detector selection (Stage 4 only adds
+# that for uploaded-video jobs, see get_job_detector below).
 DETECTOR_TYPE = os.environ.get("DETECTOR_TYPE", "yolo")
 detector = create_detector(DETECTOR_TYPE, model_path=model_path)
+
+# Per-job detector selection for uploaded-video processing only
+# (Stage 4). "yolo" always resolves to the same default `detector`
+# instance above. Any other detector type (currently just
+# "grounding_dino") is constructed lazily on first use and cached
+# here so it loads once per server process, not once per job and
+# never once per frame — loading it is expensive (~2.5s) and it's
+# only needed at all if a research job actually requests it.
+_job_detector_cache = {}
+
+
+def get_job_detector(detector_type):
+    if detector_type == "yolo":
+        return detector
+
+    if detector_type not in _job_detector_cache:
+        _job_detector_cache[detector_type] = create_detector(
+            detector_type, model_path=model_path
+        )
+
+    return _job_detector_cache[detector_type]
+
 
 jobs_lock = threading.Lock()
 
@@ -244,9 +268,35 @@ def draw_detections(frame, detections):
     return frame
 
 
-def process_video(job_id, input_path, output_path):
+def process_video(
+    job_id,
+    input_path,
+    output_path,
+    detector_type="yolo",
+    frame_stride=None,
+    sample_fps=None,
+):
+    """
+    frame_stride controls how many source frames are skipped between
+    analyzed ("sampled") frames — 1 means every frame (YOLO's original,
+    unchanged default). sample_fps is an alternative way to express
+    the same thing (e.g. sample_fps=1 -> roughly 1 analyzed frame per
+    second of source video); it's resolved to a frame_stride once the
+    source FPS is known below. If neither is given: YOLO keeps its
+    original every-frame behavior; any other detector defaults to
+    ~1 analyzed frame/sec, since it's expected to be much slower and
+    "do not blindly process every video frame" for it — fully
+    overridable via frame_stride/sample_fps either way.
+
+    Skipped frames are still written to the output video unannotated
+    (no boxes), so the output stays a valid, correctly-timed video
+    without ever implying inference happened on a frame that was never
+    analyzed. No tracking/interpolation is used to fill in skipped
+    frames.
+    """
     video_capture = None
     video_writer = None
+    job_start_time = time.time()
 
     try:
         update_job(
@@ -255,6 +305,8 @@ def process_video(job_id, input_path, output_path):
             progress=0,
             message="Opening video",
         )
+
+        job_detector = get_job_detector(detector_type)
 
         video_capture = cv2.VideoCapture(
             str(input_path)
@@ -280,6 +332,15 @@ def process_video(job_id, input_path, output_path):
             or frames_per_second <= 0
         ):
             frames_per_second = 30.0
+
+        if frame_stride is not None:
+            frame_stride = max(1, int(frame_stride))
+        elif sample_fps is not None and sample_fps > 0:
+            frame_stride = max(1, round(frames_per_second / sample_fps))
+        elif detector_type != "yolo":
+            frame_stride = max(1, round(frames_per_second))
+        else:
+            frame_stride = 1
 
         frame_width = int(
             video_capture.get(
@@ -313,7 +374,14 @@ def process_video(job_id, input_path, output_path):
                 "output video"
             )
 
+        total_sampled_frames = (
+            math.ceil(total_frames / frame_stride)
+            if total_frames > 0
+            else 0
+        )
+
         frame_index = 0
+        sampled_frame_count = 0
         frames_with_detections = 0
         total_detections = 0
         detection_events = []
@@ -325,41 +393,68 @@ def process_video(job_id, input_path, output_path):
             if not success or frame is None:
                 break
 
-            detections = detector.detect(
-                frame,
-                confidence_threshold=get_confidence_threshold(),
+            is_sampled_frame = (
+                frame_index % frame_stride == 0
             )
 
-            if detections:
-                timestamp_seconds = (
-                    frame_index / frames_per_second
+            if is_sampled_frame:
+                detections = job_detector.detect(
+                    frame,
+                    confidence_threshold=get_confidence_threshold(),
                 )
 
-                frames_with_detections += 1
-                total_detections += len(
-                    detections
-                )
+                for detection in detections:
+                    detection["detector"] = job_detector.detector_type
 
-                detection_events.append(
-                    {
-                        "frame": frame_index,
-                        "timestamp_seconds": round(
-                            timestamp_seconds,
-                            3,
-                        ),
-                        "detections": detections,
-                    }
-                )
+                sampled_frame_count += 1
 
-            annotated_frame = draw_detections(
-                frame,
-                detections,
-            )
+                if detections:
+                    timestamp_seconds = (
+                        frame_index / frames_per_second
+                    )
+
+                    frames_with_detections += 1
+                    total_detections += len(
+                        detections
+                    )
+
+                    detection_events.append(
+                        {
+                            "frame": frame_index,
+                            "timestamp_seconds": round(
+                                timestamp_seconds,
+                                3,
+                            ),
+                            "detections": detections,
+                        }
+                    )
+
+                annotated_frame = draw_detections(
+                    frame,
+                    detections,
+                )
+            else:
+                # Not analyzed this pass — write the original frame
+                # unmodified rather than drawing stale/interpolated
+                # boxes, so the output never implies inference ran
+                # here.
+                annotated_frame = frame
 
             video_writer.write(annotated_frame)
             frame_index += 1
 
-            if total_frames > 0:
+            if frame_stride > 1 and total_sampled_frames > 0:
+                progress = min(
+                    int(
+                        (
+                            sampled_frame_count
+                            / total_sampled_frames
+                        )
+                        * 100
+                    ),
+                    99,
+                )
+            elif total_frames > 0:
                 progress = min(
                     int(
                         (
@@ -378,6 +473,11 @@ def process_video(job_id, input_path, output_path):
                     job_id,
                     progress=progress,
                     processed_frames=frame_index,
+                    processed_sampled_frames=sampled_frame_count,
+                    total_sampled_frames=total_sampled_frames,
+                    elapsed_processing_seconds=round(
+                        time.time() - job_start_time, 2
+                    ),
                     message=(
                         f"Processing frame "
                         f"{frame_index}"
@@ -415,6 +515,15 @@ def process_video(job_id, input_path, output_path):
             total_frames=(
                 total_frames or frame_index
             ),
+            processed_sampled_frames=sampled_frame_count,
+            total_sampled_frames=(
+                total_sampled_frames or sampled_frame_count
+            ),
+            detector_type=detector_type,
+            frame_stride=frame_stride,
+            elapsed_processing_seconds=round(
+                time.time() - job_start_time, 2
+            ),
             frames_with_detections=(
                 frames_with_detections
             ),
@@ -449,12 +558,18 @@ async def process_video_in_background(
     job_id,
     input_path,
     output_path,
+    detector_type="yolo",
+    frame_stride=None,
+    sample_fps=None,
 ):
     await asyncio.to_thread(
         process_video,
         job_id,
         input_path,
         output_path,
+        detector_type,
+        frame_stride,
+        sample_fps,
     )
 
 
@@ -530,6 +645,9 @@ async def update_settings(
 )
 async def upload_video(
     file: UploadFile = File(...),
+    detector_type: str = Form("yolo"),
+    frame_stride: int | None = Form(None),
+    sample_fps: float | None = Form(None),
     current_user: dict = Depends(get_current_user),
 ):
     original_filename = (
@@ -549,6 +667,30 @@ async def upload_video(
                 "M4V, or WEBM."
             ),
         )
+
+    if detector_type not in AVAILABLE_DETECTOR_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Unknown detector_type {detector_type!r}. "
+                f"Available: {', '.join(AVAILABLE_DETECTOR_TYPES)}."
+            ),
+        )
+
+    if detector_type != "yolo":
+        # Research-only detector selection, gated on actually being
+        # constructable here (research/GPU environment: dependencies
+        # installed and CUDA available). Checked before accepting the
+        # upload so a misconfigured request fails fast, without
+        # wasting a large file upload or creating a job that would
+        # only fail later in the background.
+        try:
+            get_job_detector(detector_type)
+        except DetectorUnavailableError as error:
+            raise HTTPException(
+                status_code=400,
+                detail=str(error),
+            ) from error
 
     job_id = uuid.uuid4().hex
 
@@ -606,10 +748,15 @@ async def upload_video(
             ),
             "processed_frames": 0,
             "total_frames": 0,
+            "processed_sampled_frames": 0,
+            "total_sampled_frames": 0,
             "frames_with_detections": 0,
             "total_detections": 0,
             "detection_events": [],
             "review_summary": None,
+            "detector_type": detector_type,
+            "frame_stride": frame_stride,
+            "elapsed_processing_seconds": 0,
             "input_path": str(input_path),
             "output_path": str(output_path),
         }
@@ -623,6 +770,9 @@ async def upload_video(
             job_id,
             input_path,
             output_path,
+            detector_type,
+            frame_stride,
+            sample_fps,
         )
     )
 
