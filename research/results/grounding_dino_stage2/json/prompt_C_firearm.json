@@ -1,0 +1,66 @@
+{
+  "tag": "prompt_C_firearm",
+  "image_path": "test_images/01_handgun_range.jpg",
+  "image_size_wh": [
+    1920,
+    1080
+  ],
+  "checkpoint": "IDEA-Research/grounding-dino-tiny",
+  "device": "cuda:1",
+  "cuda_available": true,
+  "prompt": "firearm.",
+  "box_threshold": 0.3,
+  "text_threshold": 0.25,
+  "model_load_time_seconds": 2.439,
+  "gpu_memory_mib_before_load": 0.0,
+  "gpu_memory_mib_after_load": 660.0,
+  "gpu_memory_mib_after_inference": 668.2,
+  "warmup_run": {
+    "latency_seconds": 0.519,
+    "detections": [
+      {
+        "label": "firearm",
+        "score": 0.3135,
+        "box_xyxy": [
+          935.97,
+          685.46,
+          1036.62,
+          722.45
+        ]
+      }
+    ]
+  },
+  "subsequent_runs": [
+    {
+      "latency_seconds": 0.1326,
+      "detections": [
+        {
+          "label": "firearm",
+          "score": 0.3135,
+          "box_xyxy": [
+            935.97,
+            685.46,
+            1036.62,
+            722.45
+          ]
+        }
+      ]
+    },
+    {
+      "latency_seconds": 0.1328,
+      "detections": [
+        {
+          "label": "firearm",
+          "score": 0.3135,
+          "box_xyxy": [
+            935.97,
+            685.46,
+            1036.62,
+            722.45
+          ]
+        }
+      ]
+    }
+  ],
+  "annotated_image_path": "results/grounding_dino_stage2/annotated/prompt_C_firearm.jpg"
+}

@@ -1,0 +1,269 @@
+{
+  "tag": "02_shotgun_colored_lighting",
+  "image_path": "test_images/02_shotgun_colored_lighting.jpg",
+  "strategy_A_combined": {
+    "prompt": "handgun. pistol. revolver. rifle. shotgun. knife. machete.",
+    "latency_seconds": 0.1444,
+    "detections": [
+      {
+        "raw_prompt": "handgun. pistol. revolver. rifle. shotgun. knife. machete.",
+        "raw_label": "rifle shotgun machete",
+        "score": 0.3502,
+        "box_xyxy": [
+          964.14,
+          167.09,
+          1549.47,
+          929.71
+        ],
+        "normalized_category": "UNKNOWN"
+      }
+    ]
+  },
+  "strategy_B_7prompt": {
+    "prompts": [
+      "handgun.",
+      "pistol.",
+      "revolver.",
+      "rifle.",
+      "shotgun.",
+      "knife.",
+      "machete."
+    ],
+    "per_prompt_latency_seconds": {
+      "handgun.": 0.1329,
+      "pistol.": 0.1331,
+      "revolver.": 0.1332,
+      "rifle.": 0.1338,
+      "shotgun.": 0.1333,
+      "knife.": 0.1335,
+      "machete.": 0.1336
+    },
+    "total_latency_seconds": 1.0231,
+    "raw_detection_count_before_nms": 7,
+    "detection_count_after_nms": 1,
+    "merged_detections": [
+      {
+        "raw_prompt": "shotgun.",
+        "raw_label": "shotgun",
+        "score": 0.827,
+        "box_xyxy": [
+          965.86,
+          168.98,
+          1548.34,
+          934.58
+        ],
+        "normalized_category": "FIREARM_SHOTGUN",
+        "other_matching_prompts": [
+          {
+            "raw_prompt": "pistol.",
+            "normalized_category": "FIREARM_HANDGUN",
+            "score": 0.8095
+          },
+          {
+            "raw_prompt": "handgun.",
+            "normalized_category": "FIREARM_HANDGUN",
+            "score": 0.797
+          },
+          {
+            "raw_prompt": "revolver.",
+            "normalized_category": "FIREARM_HANDGUN",
+            "score": 0.7967
+          },
+          {
+            "raw_prompt": "rifle.",
+            "normalized_category": "FIREARM_RIFLE",
+            "score": 0.7853
+          },
+          {
+            "raw_prompt": "machete.",
+            "normalized_category": "BLADED_WEAPON",
+            "score": 0.6943
+          },
+          {
+            "raw_prompt": "knife.",
+            "normalized_category": "BLADED_WEAPON",
+            "score": 0.3003
+          }
+        ]
+      }
+    ],
+    "suppressed_as_duplicates": [
+      {
+        "raw_prompt": "pistol.",
+        "raw_label": "pistol",
+        "score": 0.8095,
+        "box_xyxy": [
+          966.87,
+          169.33,
+          1548.54,
+          933.21
+        ],
+        "normalized_category": "FIREARM_HANDGUN"
+      },
+      {
+        "raw_prompt": "handgun.",
+        "raw_label": "handgun",
+        "score": 0.797,
+        "box_xyxy": [
+          965.91,
+          169.45,
+          1550.98,
+          933.12
+        ],
+        "normalized_category": "FIREARM_HANDGUN"
+      },
+      {
+        "raw_prompt": "revolver.",
+        "raw_label": "revolver",
+        "score": 0.7967,
+        "box_xyxy": [
+          965.82,
+          169.08,
+          1549.53,
+          933.74
+        ],
+        "normalized_category": "FIREARM_HANDGUN"
+      },
+      {
+        "raw_prompt": "rifle.",
+        "raw_label": "rifle",
+        "score": 0.7853,
+        "box_xyxy": [
+          965.81,
+          169.53,
+          1550.0,
+          934.22
+        ],
+        "normalized_category": "FIREARM_RIFLE"
+      },
+      {
+        "raw_prompt": "machete.",
+        "raw_label": "machete",
+        "score": 0.6943,
+        "box_xyxy": [
+          967.5,
+          167.85,
+          1546.29,
+          931.94
+        ],
+        "normalized_category": "BLADED_WEAPON"
+      },
+      {
+        "raw_prompt": "knife.",
+        "raw_label": "knife",
+        "score": 0.3003,
+        "box_xyxy": [
+          970.85,
+          171.65,
+          1545.23,
+          929.52
+        ],
+        "normalized_category": "BLADED_WEAPON"
+      }
+    ]
+  },
+  "strategy_4prompt_subset": {
+    "prompts": [
+      "handgun.",
+      "rifle.",
+      "shotgun.",
+      "knife."
+    ],
+    "per_prompt_latency_seconds": {
+      "handgun.": 0.1331,
+      "rifle.": 0.1335,
+      "shotgun.": 0.1335,
+      "knife.": 0.1331
+    },
+    "total_latency_seconds": 0.5845,
+    "raw_detection_count_before_nms": 4,
+    "detection_count_after_nms": 1,
+    "merged_detections": [
+      {
+        "raw_prompt": "shotgun.",
+        "raw_label": "shotgun",
+        "score": 0.827,
+        "box_xyxy": [
+          965.86,
+          168.98,
+          1548.34,
+          934.58
+        ],
+        "normalized_category": "FIREARM_SHOTGUN",
+        "other_matching_prompts": [
+          {
+            "raw_prompt": "handgun.",
+            "normalized_category": "FIREARM_HANDGUN",
+            "score": 0.797
+          },
+          {
+            "raw_prompt": "rifle.",
+            "normalized_category": "FIREARM_RIFLE",
+            "score": 0.7853
+          },
+          {
+            "raw_prompt": "knife.",
+            "normalized_category": "BLADED_WEAPON",
+            "score": 0.3003
+          }
+        ]
+      }
+    ],
+    "suppressed_as_duplicates": [
+      {
+        "raw_prompt": "handgun.",
+        "raw_label": "handgun",
+        "score": 0.797,
+        "box_xyxy": [
+          965.91,
+          169.45,
+          1550.98,
+          933.12
+        ],
+        "normalized_category": "FIREARM_HANDGUN"
+      },
+      {
+        "raw_prompt": "rifle.",
+        "raw_label": "rifle",
+        "score": 0.7853,
+        "box_xyxy": [
+          965.81,
+          169.53,
+          1550.0,
+          934.22
+        ],
+        "normalized_category": "FIREARM_RIFLE"
+      },
+      {
+        "raw_prompt": "knife.",
+        "raw_label": "knife",
+        "score": 0.3003,
+        "box_xyxy": [
+          970.85,
+          171.65,
+          1545.23,
+          929.52
+        ],
+        "normalized_category": "BLADED_WEAPON"
+      }
+    ]
+  },
+  "strategy_C_best_single": {
+    "prompt": "shotgun.",
+    "latency_seconds": 0.1333,
+    "detections": [
+      {
+        "raw_prompt": "shotgun.",
+        "raw_label": "shotgun",
+        "score": 0.827,
+        "box_xyxy": [
+          965.86,
+          168.98,
+          1548.34,
+          934.58
+        ],
+        "normalized_category": "FIREARM_SHOTGUN"
+      }
+    ]
+  }
+}

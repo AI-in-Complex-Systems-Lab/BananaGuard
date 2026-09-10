@@ -1,0 +1,96 @@
+{
+  "tag": "prompt_D_person_holding",
+  "image_path": "test_images/01_handgun_range.jpg",
+  "image_size_wh": [
+    1920,
+    1080
+  ],
+  "checkpoint": "IDEA-Research/grounding-dino-tiny",
+  "device": "cuda:1",
+  "cuda_available": true,
+  "prompt": "person holding a handgun.",
+  "box_threshold": 0.3,
+  "text_threshold": 0.25,
+  "model_load_time_seconds": 2.419,
+  "gpu_memory_mib_before_load": 0.0,
+  "gpu_memory_mib_after_load": 660.0,
+  "gpu_memory_mib_after_inference": 668.2,
+  "warmup_run": {
+    "latency_seconds": 0.5169,
+    "detections": [
+      {
+        "label": "person",
+        "score": 0.476,
+        "box_xyxy": [
+          507.14,
+          598.51,
+          1004.21,
+          1073.41
+        ]
+      },
+      {
+        "label": "person",
+        "score": 0.3169,
+        "box_xyxy": [
+          3.2,
+          262.09,
+          418.88,
+          1073.68
+        ]
+      }
+    ]
+  },
+  "subsequent_runs": [
+    {
+      "latency_seconds": 0.1331,
+      "detections": [
+        {
+          "label": "person",
+          "score": 0.476,
+          "box_xyxy": [
+            507.14,
+            598.51,
+            1004.21,
+            1073.41
+          ]
+        },
+        {
+          "label": "person",
+          "score": 0.3169,
+          "box_xyxy": [
+            3.2,
+            262.09,
+            418.88,
+            1073.68
+          ]
+        }
+      ]
+    },
+    {
+      "latency_seconds": 0.1336,
+      "detections": [
+        {
+          "label": "person",
+          "score": 0.476,
+          "box_xyxy": [
+            507.14,
+            598.51,
+            1004.21,
+            1073.41
+          ]
+        },
+        {
+          "label": "person",
+          "score": 0.3169,
+          "box_xyxy": [
+            3.2,
+            262.09,
+            418.88,
+            1073.68
+          ]
+        }
+      ]
+    }
+  ],
+  "annotated_image_path": "results/grounding_dino_stage2/annotated/prompt_D_person_holding.jpg"
+}

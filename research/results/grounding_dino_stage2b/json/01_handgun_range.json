@@ -1,0 +1,174 @@
+{
+  "tag": "01_handgun_range",
+  "image_path": "test_images/01_handgun_range.jpg",
+  "strategy_A_combined": {
+    "prompt": "handgun. pistol. revolver. rifle. shotgun. knife. machete.",
+    "latency_seconds": 0.5286,
+    "detections": []
+  },
+  "strategy_B_7prompt": {
+    "prompts": [
+      "handgun.",
+      "pistol.",
+      "revolver.",
+      "rifle.",
+      "shotgun.",
+      "knife.",
+      "machete."
+    ],
+    "per_prompt_latency_seconds": {
+      "handgun.": 0.134,
+      "pistol.": 0.1328,
+      "revolver.": 0.1327,
+      "rifle.": 0.1329,
+      "shotgun.": 0.1331,
+      "knife.": 0.1328,
+      "machete.": 0.1334
+    },
+    "total_latency_seconds": 1.0574,
+    "raw_detection_count_before_nms": 4,
+    "detection_count_after_nms": 2,
+    "merged_detections": [
+      {
+        "raw_prompt": "pistol.",
+        "raw_label": "pistol",
+        "score": 0.3634,
+        "box_xyxy": [
+          936.44,
+          685.69,
+          1037.05,
+          722.94
+        ],
+        "normalized_category": "FIREARM_HANDGUN",
+        "other_matching_prompts": [
+          {
+            "raw_prompt": "handgun.",
+            "normalized_category": "FIREARM_HANDGUN",
+            "score": 0.3561
+          }
+        ]
+      },
+      {
+        "raw_prompt": "pistol.",
+        "raw_label": "pistol",
+        "score": 0.3183,
+        "box_xyxy": [
+          787.53,
+          911.46,
+          852.37,
+          938.39
+        ],
+        "normalized_category": "FIREARM_HANDGUN",
+        "other_matching_prompts": [
+          {
+            "raw_prompt": "handgun.",
+            "normalized_category": "FIREARM_HANDGUN",
+            "score": 0.3171
+          }
+        ]
+      }
+    ],
+    "suppressed_as_duplicates": [
+      {
+        "raw_prompt": "handgun.",
+        "raw_label": "handgun",
+        "score": 0.3561,
+        "box_xyxy": [
+          936.14,
+          683.89,
+          1038.45,
+          723.56
+        ],
+        "normalized_category": "FIREARM_HANDGUN"
+      },
+      {
+        "raw_prompt": "handgun.",
+        "raw_label": "handgun",
+        "score": 0.3171,
+        "box_xyxy": [
+          788.41,
+          911.62,
+          852.37,
+          938.77
+        ],
+        "normalized_category": "FIREARM_HANDGUN"
+      }
+    ]
+  },
+  "strategy_4prompt_subset": {
+    "prompts": [
+      "handgun.",
+      "rifle.",
+      "shotgun.",
+      "knife."
+    ],
+    "per_prompt_latency_seconds": {
+      "handgun.": 0.1333,
+      "rifle.": 0.1329,
+      "shotgun.": 0.1331,
+      "knife.": 0.133
+    },
+    "total_latency_seconds": 0.6025,
+    "raw_detection_count_before_nms": 2,
+    "detection_count_after_nms": 2,
+    "merged_detections": [
+      {
+        "raw_prompt": "handgun.",
+        "raw_label": "handgun",
+        "score": 0.3561,
+        "box_xyxy": [
+          936.14,
+          683.89,
+          1038.45,
+          723.56
+        ],
+        "normalized_category": "FIREARM_HANDGUN",
+        "other_matching_prompts": []
+      },
+      {
+        "raw_prompt": "handgun.",
+        "raw_label": "handgun",
+        "score": 0.3171,
+        "box_xyxy": [
+          788.41,
+          911.62,
+          852.37,
+          938.77
+        ],
+        "normalized_category": "FIREARM_HANDGUN",
+        "other_matching_prompts": []
+      }
+    ],
+    "suppressed_as_duplicates": []
+  },
+  "strategy_C_best_single": {
+    "prompt": "handgun.",
+    "latency_seconds": 0.133,
+    "detections": [
+      {
+        "raw_prompt": "handgun.",
+        "raw_label": "handgun",
+        "score": 0.3171,
+        "box_xyxy": [
+          788.41,
+          911.62,
+          852.37,
+          938.77
+        ],
+        "normalized_category": "FIREARM_HANDGUN"
+      },
+      {
+        "raw_prompt": "handgun.",
+        "raw_label": "handgun",
+        "score": 0.3561,
+        "box_xyxy": [
+          936.14,
+          683.89,
+          1038.45,
+          723.56
+        ],
+        "normalized_category": "FIREARM_HANDGUN"
+      }
+    ]
+  }
+}

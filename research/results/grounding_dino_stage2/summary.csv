@@ -1,0 +1,11 @@
+tag,image_path,image_size_wh,prompt,box_threshold,text_threshold,detection_count,detected_labels_and_scores,warmup_latency_s,avg_subsequent_latency_s,gpu_mem_after_load_mib,gpu_mem_after_inference_mib
+01_handgun_range_full_prompt,test_images/01_handgun_range.jpg,1920x1080,handgun. pistol. firearm. rifle. shotgun. knife. machete. person holding a handgun. person carrying a firearm.,0.3,0.25,1,person person(0.3154),0.9602,0.1452,660.0,668.2
+02_shotgun_multiclass,test_images/02_shotgun_colored_lighting.jpg,1920x1080,handgun. rifle. shotgun. knife.,0.3,0.25,1,handgun rifle shotgun(0.4134),0.5167,0.1334,660.0,668.2
+02_shotgun_solo,test_images/02_shotgun_colored_lighting.jpg,1920x1080,shotgun.,0.3,0.25,1,shotgun(0.827),0.5154,0.1329,660.0,668.2
+03_difficult_lower_threshold,test_images/03_difficult_motion_blur_crowd.jpg,1920x1080,handgun. rifle. shotgun. knife.,0.2,0.2,2,shotgun(0.2145); shotgun(0.2179),0.5164,0.1336,660.0,668.2
+03_difficult_multiclass,test_images/03_difficult_motion_blur_crowd.jpg,1920x1080,handgun. rifle. shotgun. knife.,0.3,0.25,0,NONE,0.5166,0.1343,660.0,668.2
+prompt_A_gun,test_images/01_handgun_range.jpg,1920x1080,gun.,0.3,0.25,1,gun(0.3116),0.518,0.1328,660.0,668.2
+prompt_B_handgun,test_images/01_handgun_range.jpg,1920x1080,handgun.,0.3,0.25,2,handgun(0.3171); handgun(0.3561),0.517,0.1324,660.0,668.2
+prompt_C_firearm,test_images/01_handgun_range.jpg,1920x1080,firearm.,0.3,0.25,1,firearm(0.3135),0.519,0.1327,660.0,668.2
+prompt_D_person_holding,test_images/01_handgun_range.jpg,1920x1080,person holding a handgun.,0.3,0.25,2,person(0.476); person(0.3169),0.5169,0.1333,660.0,668.2
+prompt_E_multi,test_images/01_handgun_range.jpg,1920x1080,handgun. pistol. firearm.,0.3,0.25,0,NONE,0.5154,0.1333,660.0,668.2

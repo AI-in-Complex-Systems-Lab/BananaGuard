@@ -1,0 +1,11 @@
+{
+  "avg_single_prompt_latency_seconds": 0.1332,
+  "avg_combined_prompt_latency_seconds": 0.2726,
+  "avg_7prompt_sequential_total_seconds": 1.0319,
+  "avg_4prompt_sequential_total_seconds": 0.5894,
+  "theoretical_fps_combined": 3.67,
+  "theoretical_fps_7prompt": 0.97,
+  "theoretical_fps_4prompt": 1.7,
+  "gpu_memory_mib_final": 668.2,
+  "feature_reuse_finding": "Inspected transformers/models/grounding_dino/modeling_grounding_dino.py (GroundingDinoModel.forward): the vision backbone call `self.backbone(pixel_values, pixel_mask)` takes no text input and runs before any image/text fusion, so the image features ARE architecturally independent of the prompt. However, the public model.forward()/__call__ API recomputes the backbone from raw pixel_values on every single call and exposes no parameter to inject precomputed vision features back in. So: reuse is architecturally possible, but NOT available through normal use of the HF API \u2014 it would require subclassing/monkey-patching the model to call the backbone once and feed cached features into the rest of the forward pass manually. Not attempted here (would be optimization, not measurement)."
+}

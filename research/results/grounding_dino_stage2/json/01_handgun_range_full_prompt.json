@@ -1,0 +1,81 @@
+{
+  "tag": "01_handgun_range_full_prompt",
+  "image_path": "test_images/01_handgun_range.jpg",
+  "image_size_wh": [
+    1920,
+    1080
+  ],
+  "checkpoint": "IDEA-Research/grounding-dino-tiny",
+  "device": "cuda:1",
+  "cuda_available": true,
+  "prompt": "handgun. pistol. firearm. rifle. shotgun. knife. machete. person holding a handgun. person carrying a firearm.",
+  "box_threshold": 0.3,
+  "text_threshold": 0.25,
+  "model_load_time_seconds": 2.487,
+  "gpu_memory_mib_before_load": 0.0,
+  "gpu_memory_mib_after_load": 660.0,
+  "gpu_memory_mib_after_inference": 668.2,
+  "warmup_run": {
+    "latency_seconds": 0.9602,
+    "detections": [
+      {
+        "label": "person person",
+        "score": 0.3154,
+        "box_xyxy": [
+          487.91,
+          596.9,
+          1002.77,
+          1073.69
+        ]
+      }
+    ]
+  },
+  "subsequent_runs": [
+    {
+      "latency_seconds": 0.145,
+      "detections": [
+        {
+          "label": "person person",
+          "score": 0.3154,
+          "box_xyxy": [
+            487.91,
+            596.9,
+            1002.77,
+            1073.69
+          ]
+        }
+      ]
+    },
+    {
+      "latency_seconds": 0.1452,
+      "detections": [
+        {
+          "label": "person person",
+          "score": 0.3154,
+          "box_xyxy": [
+            487.91,
+            596.9,
+            1002.77,
+            1073.69
+          ]
+        }
+      ]
+    },
+    {
+      "latency_seconds": 0.1453,
+      "detections": [
+        {
+          "label": "person person",
+          "score": 0.3154,
+          "box_xyxy": [
+            487.91,
+            596.9,
+            1002.77,
+            1073.69
+          ]
+        }
+      ]
+    }
+  ],
+  "annotated_image_path": "results/grounding_dino_stage2/annotated/01_handgun_range_full_prompt.jpg"
+}

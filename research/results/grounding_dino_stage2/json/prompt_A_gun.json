@@ -1,0 +1,66 @@
+{
+  "tag": "prompt_A_gun",
+  "image_path": "test_images/01_handgun_range.jpg",
+  "image_size_wh": [
+    1920,
+    1080
+  ],
+  "checkpoint": "IDEA-Research/grounding-dino-tiny",
+  "device": "cuda:1",
+  "cuda_available": true,
+  "prompt": "gun.",
+  "box_threshold": 0.3,
+  "text_threshold": 0.25,
+  "model_load_time_seconds": 2.498,
+  "gpu_memory_mib_before_load": 0.0,
+  "gpu_memory_mib_after_load": 660.0,
+  "gpu_memory_mib_after_inference": 668.2,
+  "warmup_run": {
+    "latency_seconds": 0.518,
+    "detections": [
+      {
+        "label": "gun",
+        "score": 0.3116,
+        "box_xyxy": [
+          466.07,
+          903.01,
+          631.47,
+          1055.1
+        ]
+      }
+    ]
+  },
+  "subsequent_runs": [
+    {
+      "latency_seconds": 0.1329,
+      "detections": [
+        {
+          "label": "gun",
+          "score": 0.3116,
+          "box_xyxy": [
+            466.07,
+            903.01,
+            631.47,
+            1055.1
+          ]
+        }
+      ]
+    },
+    {
+      "latency_seconds": 0.1327,
+      "detections": [
+        {
+          "label": "gun",
+          "score": 0.3116,
+          "box_xyxy": [
+            466.07,
+            903.01,
+            631.47,
+            1055.1
+          ]
+        }
+      ]
+    }
+  ],
+  "annotated_image_path": "results/grounding_dino_stage2/annotated/prompt_A_gun.jpg"
+}

@@ -1,0 +1,66 @@
+{
+  "tag": "02_shotgun_multiclass",
+  "image_path": "test_images/02_shotgun_colored_lighting.jpg",
+  "image_size_wh": [
+    1920,
+    1080
+  ],
+  "checkpoint": "IDEA-Research/grounding-dino-tiny",
+  "device": "cuda:1",
+  "cuda_available": true,
+  "prompt": "handgun. rifle. shotgun. knife.",
+  "box_threshold": 0.3,
+  "text_threshold": 0.25,
+  "model_load_time_seconds": 2.456,
+  "gpu_memory_mib_before_load": 0.0,
+  "gpu_memory_mib_after_load": 660.0,
+  "gpu_memory_mib_after_inference": 668.2,
+  "warmup_run": {
+    "latency_seconds": 0.5167,
+    "detections": [
+      {
+        "label": "handgun rifle shotgun",
+        "score": 0.4134,
+        "box_xyxy": [
+          964.61,
+          169.01,
+          1547.47,
+          932.42
+        ]
+      }
+    ]
+  },
+  "subsequent_runs": [
+    {
+      "latency_seconds": 0.1331,
+      "detections": [
+        {
+          "label": "handgun rifle shotgun",
+          "score": 0.4134,
+          "box_xyxy": [
+            964.61,
+            169.01,
+            1547.47,
+            932.42
+          ]
+        }
+      ]
+    },
+    {
+      "latency_seconds": 0.1337,
+      "detections": [
+        {
+          "label": "handgun rifle shotgun",
+          "score": 0.4134,
+          "box_xyxy": [
+            964.61,
+            169.01,
+            1547.47,
+            932.42
+          ]
+        }
+      ]
+    }
+  ],
+  "annotated_image_path": "results/grounding_dino_stage2/annotated/02_shotgun_multiclass.jpg"
+}

@@ -1,0 +1,13 @@
+tag,strategy,prompt_or_prompts,detections_final,raw_before_nms,latency_seconds
+01_handgun_range,A_combined,handgun. pistol. revolver. rifle. shotgun. knife. machete.,0,0,0.5286
+01_handgun_range,B_7prompt_merged,handgun. | pistol. | revolver. | rifle. | shotgun. | knife. | machete.,2,4,1.0574
+01_handgun_range,4prompt_subset_merged,handgun. | rifle. | shotgun. | knife.,2,2,0.6025
+01_handgun_range,C_best_single,handgun.,2,2,0.133
+02_shotgun_colored_lighting,A_combined,handgun. pistol. revolver. rifle. shotgun. knife. machete.,1,1,0.1444
+02_shotgun_colored_lighting,B_7prompt_merged,handgun. | pistol. | revolver. | rifle. | shotgun. | knife. | machete.,1,7,1.0231
+02_shotgun_colored_lighting,4prompt_subset_merged,handgun. | rifle. | shotgun. | knife.,1,4,0.5845
+02_shotgun_colored_lighting,C_best_single,shotgun.,1,1,0.1333
+03_difficult_motion_blur_crowd,A_combined,handgun. pistol. revolver. rifle. shotgun. knife. machete.,0,0,0.1448
+03_difficult_motion_blur_crowd,B_7prompt_merged,handgun. | pistol. | revolver. | rifle. | shotgun. | knife. | machete.,2,3,1.0153
+03_difficult_motion_blur_crowd,4prompt_subset_merged,handgun. | rifle. | shotgun. | knife.,0,0,0.5812
+03_difficult_motion_blur_crowd,C_best_single,pistol.,1,1,0.1334

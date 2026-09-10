@@ -1,0 +1,40 @@
+BananaGuard Stage 2 - Grounding DINO environment inspection
+=============================================================
+
+OS: Ubuntu 24.04.4 LTS (Linux ai-lab-lambda 7.0.0-28-generic x86_64)
+System Python: 3.12.3 (not used directly; isolated conda env created instead)
+
+GPU: 2x NVIDIA RTX A6000 (49140 MiB each)
+Driver: 580.173.02, CUDA (driver max): 13.0
+nvcc (CUDA toolkit installed): release 12.0, V12.0.140
+
+Pre-install state:
+  conda: not installed
+  existing venvs: none
+  global torch: not installed
+  disk free: 5.6TB / 7.0TB
+
+Isolated environment created:
+  Method: Miniconda installed to ~/vlm-research/miniconda3 (user-space, no sudo)
+  Conda env: groundingdino, Python 3.11.16
+
+Installed packages (pip freeze, filtered):
+  torch==2.5.1+cu121
+  torchvision==0.20.1+cu121
+  transformers==5.17.0
+  accelerate==1.15.0
+  numpy==2.4.6
+  pillow==12.3.0
+  safetensors==0.8.0
+  tokenizers==0.23.2
+
+GPU verification:
+  torch.cuda.is_available(): True
+  torch.cuda.device_count(): 2
+  Model device used: cuda:1 (kept fully idle GPU 1 free of any desktop/X11 overhead)
+  Checkpoint: IDEA-Research/grounding-dino-tiny (via GroundingDinoForObjectDetection / GroundingDinoProcessor)
+  GPU memory before model load: 0.0 MiB
+  GPU memory after model load: 660.0 MiB (672.0 MiB reserved)
+  Model load time (first run, includes download): 10.49s
+  Model load time (subsequent runs, weights cached locally): ~2.4-2.5s
+  Model dtype: float32
