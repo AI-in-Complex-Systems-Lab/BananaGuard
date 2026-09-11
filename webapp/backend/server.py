@@ -380,6 +380,18 @@ def process_video(
             else 0
         )
 
+        # Captured once per job (not re-read per frame) so a job's
+        # persisted metadata always accurately reflects what was
+        # actually used for every frame in it, even if an admin
+        # changes the global setting while a long job is running.
+        confidence_threshold_used = get_confidence_threshold()
+
+        source_duration_seconds = (
+            round(total_frames / frames_per_second, 3)
+            if total_frames > 0
+            else None
+        )
+
         frame_index = 0
         sampled_frame_count = 0
         frames_with_detections = 0
@@ -400,7 +412,7 @@ def process_video(
             if is_sampled_frame:
                 detections = job_detector.detect(
                     frame,
-                    confidence_threshold=get_confidence_threshold(),
+                    confidence_threshold=confidence_threshold_used,
                 )
 
                 for detection in detections:
@@ -520,6 +532,10 @@ def process_video(
                 total_sampled_frames or sampled_frame_count
             ),
             detector_type=detector_type,
+            detector_prompts=getattr(job_detector, "prompts", None),
+            confidence_threshold_used=confidence_threshold_used,
+            source_fps=round(frames_per_second, 3),
+            source_duration_seconds=source_duration_seconds,
             frame_stride=frame_stride,
             elapsed_processing_seconds=round(
                 time.time() - job_start_time, 2
@@ -1141,6 +1157,313 @@ async def export_dataset(
             ),
         },
     )
+
+
+# --- Research: Model Comparison (Stage 5) ---
+#
+# Read-only over data two already-completed jobs already produced.
+# Nothing here changes how a job is processed, and it doesn't touch
+# live-camera behavior at all. Only ever compares two existing
+# detector runs against each other — never invents or estimates a
+# metric that isn't directly computed from those two jobs' own
+# stored detection_events.
+
+DEFAULT_TIMELINE_WINDOW_SECONDS = 2.0
+
+# Human-curated observations from manually reviewing real detections
+# (Stage 4) against their source frames. These are NOT algorithmically
+# derived — nothing in this file tries to guess "false positive" or
+# "mislabel" from the data alone, since that requires a human looking
+# at the frame (or real ground truth), neither of which this endpoint
+# has. Shown only when a compared job matches one of these by source
+# filename (and detector type, where relevant), each linked to the
+# actual frame that was reviewed via the existing frame-image endpoint.
+KNOWN_RESEARCH_NOTES = [
+    {
+        "source_video_filename": "force_on_force.mp4",
+        "detector_type": "grounding_dino",
+        "frame": 1935,
+        "note": (
+            "Visually confirmed false positive: labeled "
+            "FIREARM_SHOTGUN at 0.51 confidence on an empty room — "
+            "no person or weapon visible in the frame."
+        ),
+    },
+    {
+        "source_video_filename": "force_on_force.mp4",
+        "detector_type": "grounding_dino",
+        "frame": 4110,
+        "note": (
+            "Visually confirmed mislabel: a clearly-visible, "
+            "two-handed handgun was labeled FIREARM_SHOTGUN at 0.65 "
+            "confidence."
+        ),
+    },
+    {
+        "source_video_filename": "force_on_force.mp4",
+        "detector_type": "yolo",
+        "frame": None,
+        "note": (
+            "Every detection this job produced was labeled "
+            "\"handgun\" — no rifle/shotgun/knife detections at all "
+            "on this video, despite the model supporting those "
+            "classes."
+        ),
+    },
+    {
+        "source_video_filename": "force_on_force.mp4",
+        "detector_type": None,
+        "frame": None,
+        "note": (
+            "Both models independently concentrated the large "
+            "majority of their detections in the same ~110-146s "
+            "window of this video."
+        ),
+    },
+]
+
+
+def summarize_detections(detection_events):
+    total = 0
+    by_category = {}
+    scores = []
+    timestamps = []
+
+    for event in detection_events:
+        timestamp = event["timestamp_seconds"]
+
+        for detection in event["detections"]:
+            total += 1
+            label = detection["label"]
+            by_category[label] = by_category.get(label, 0) + 1
+            scores.append(detection["score"])
+            timestamps.append(timestamp)
+
+    return {
+        "total_detections": total,
+        "frames_with_detections": len(detection_events),
+        "detections_by_category": by_category,
+        "average_confidence": (
+            round(sum(scores) / len(scores), 4) if scores else None
+        ),
+        "max_confidence": round(max(scores), 4) if scores else None,
+        "first_detection_timestamp": (
+            round(min(timestamps), 3) if timestamps else None
+        ),
+        "last_detection_timestamp": (
+            round(max(timestamps), 3) if timestamps else None
+        ),
+    }
+
+
+def build_comparison_job_view(job):
+    detector_type = job.get("detector_type") or "yolo"
+
+    analyzed_frames = (
+        job.get("total_sampled_frames")
+        or job.get("total_frames")
+        or job.get("processed_frames")
+    )
+
+    elapsed = job.get("elapsed_processing_seconds") or 0
+
+    throughput = (
+        round(analyzed_frames / elapsed, 2)
+        if elapsed and analyzed_frames
+        else None
+    )
+
+    summary = summarize_detections(job.get("detection_events") or [])
+
+    detections_per_analyzed_frame = (
+        round(summary["total_detections"] / analyzed_frames, 4)
+        if analyzed_frames
+        else None
+    )
+
+    return {
+        "job_id": job["job_id"],
+        "filename": job.get("filename"),
+        "status": job.get("status"),
+        "metadata": {
+            "detector_type": detector_type,
+            "supports_text_prompts": detector_type == "grounding_dino",
+            "prompts": job.get("detector_prompts"),
+            "confidence_threshold": job.get(
+                "confidence_threshold_used"
+            ),
+            "source_fps": job.get("source_fps"),
+            "source_duration_seconds": job.get(
+                "source_duration_seconds"
+            ),
+            "total_frames": job.get("total_frames"),
+            "frame_stride": job.get("frame_stride"),
+            "analyzed_frames": analyzed_frames,
+            "elapsed_processing_seconds": job.get(
+                "elapsed_processing_seconds"
+            ),
+            "throughput_analyzed_fps": throughput,
+        },
+        "summary": {
+            **summary,
+            "detections_per_analyzed_frame": (
+                detections_per_analyzed_frame
+            ),
+        },
+    }
+
+
+def build_comparison_timeline(job_a, job_b, window_seconds):
+    duration = max(
+        job_a.get("source_duration_seconds") or 0,
+        job_b.get("source_duration_seconds") or 0,
+    )
+
+    if duration <= 0:
+        return {"window_seconds": window_seconds, "bins": []}
+
+    bin_count = max(1, math.ceil(duration / window_seconds))
+
+    bins = [
+        {
+            "start_seconds": round(i * window_seconds, 2),
+            "end_seconds": round(
+                (i + 1) * window_seconds, 2
+            ),
+            "job_a": False,
+            "job_b": False,
+        }
+        for i in range(bin_count)
+    ]
+
+    def mark(job, key):
+        for event in job.get("detection_events") or []:
+            index = int(
+                event["timestamp_seconds"] / window_seconds
+            )
+
+            if 0 <= index < len(bins):
+                bins[index][key] = True
+
+    mark(job_a, "job_a")
+    mark(job_b, "job_b")
+
+    for bin_entry in bins:
+        bin_entry["both"] = (
+            bin_entry["job_a"] and bin_entry["job_b"]
+        )
+
+    return {"window_seconds": window_seconds, "bins": bins}
+
+
+def get_research_notes_for_jobs(job_a, job_b):
+    notes = []
+    seen = set()
+
+    for job in (job_a, job_b):
+        for note in KNOWN_RESEARCH_NOTES:
+            if (
+                note["source_video_filename"]
+                != job.get("filename")
+            ):
+                continue
+
+            if (
+                note["detector_type"] is not None
+                and note["detector_type"]
+                != job.get("detector_type")
+            ):
+                continue
+
+            key = (
+                note["source_video_filename"],
+                note["detector_type"],
+                note["frame"],
+                note["note"],
+            )
+
+            if key in seen:
+                continue
+
+            seen.add(key)
+
+            entry = dict(note)
+            entry["job_id"] = job["job_id"]
+
+            if entry["frame"] is not None:
+                entry["frame_url"] = (
+                    f"/api/jobs/{job['job_id']}/frames/"
+                    f"{entry['frame']}"
+                )
+
+            notes.append(entry)
+
+    return notes
+
+
+@app.get("/api/research/compare")
+async def compare_jobs(
+    job_a: str,
+    job_b: str,
+    window_seconds: float = DEFAULT_TIMELINE_WINDOW_SECONDS,
+    current_user: dict = Depends(get_current_user),
+):
+    job_a_record = get_job_copy(job_a)
+    job_b_record = get_job_copy(job_b)
+
+    if job_a_record is None or job_b_record is None:
+        raise HTTPException(
+            status_code=404,
+            detail="One or both jobs were not found",
+        )
+
+    for job in (job_a_record, job_b_record):
+        if job.get("status") != "completed":
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Job {job['job_id']} has not completed "
+                    "processing yet, so it has no results to "
+                    "compare"
+                ),
+            )
+
+    same_source_video = (
+        job_a_record.get("filename")
+        == job_b_record.get("filename")
+    )
+
+    warning = (
+        None
+        if same_source_video
+        else (
+            "These two jobs were run on different source videos "
+            f"({job_a_record.get('filename')!r} vs. "
+            f"{job_b_record.get('filename')!r}). Comparing their "
+            "results is not scientifically fair — differences may "
+            "simply reflect different footage, not different "
+            "detector behavior."
+        )
+    )
+
+    return {
+        "warning": warning,
+        "jobs": {
+            "job_a": build_comparison_job_view(job_a_record),
+            "job_b": build_comparison_job_view(job_b_record),
+        },
+        "timeline": build_comparison_timeline(
+            job_a_record, job_b_record, window_seconds
+        ),
+        "qualitative_notes": get_research_notes_for_jobs(
+            job_a_record, job_b_record
+        ),
+        "ground_truth_evaluation": {
+            "available": False,
+            "message": "Ground-truth evaluation not available yet.",
+            "metrics": None,
+        },
+    }
 
 
 @app.websocket("/ws")

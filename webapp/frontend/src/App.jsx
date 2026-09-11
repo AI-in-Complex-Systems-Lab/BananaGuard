@@ -9,6 +9,7 @@ import DetectionEventsPage from './DetectionEventsPage';
 import EventReviewPage from './EventReviewPage';
 import UsersAdminPage from './UsersAdminPage';
 import SettingsPage from './SettingsPage';
+import ModelComparisonPage from './ModelComparisonPage';
 
 
 function AuthenticatedApp({ user }) {
@@ -74,6 +75,9 @@ function AuthenticatedApp({ user }) {
 
       {activeView === 'settings' &&
         user.role === 'admin' && <SettingsPage />}
+
+      {activeView === 'model-comparison' &&
+        user.role === 'admin' && <ModelComparisonPage />}
     </AppShell>
   );
 }

@@ -14,6 +14,10 @@ const ADMIN_NAV_ITEMS = [
   { key: 'settings', icon: '◐', label: 'Settings' },
 ];
 
+const RESEARCH_NAV_ITEMS = [
+  { key: 'model-comparison', icon: '⇄', label: 'Model Comparison' },
+];
+
 const VIEW_TITLES = {
   dashboard: 'Dashboard',
   'live-cameras': 'Live Cameras',
@@ -22,6 +26,7 @@ const VIEW_TITLES = {
   'event-review': 'Event Review',
   admin: 'User Management',
   settings: 'Settings',
+  'model-comparison': 'Model Comparison',
 };
 
 function initials(name) {
@@ -81,6 +86,29 @@ function AppShell({ activeView, onNavigate, children }) {
             </button>
           ))}
         </div>
+
+        {user?.role === 'admin' && (
+          <div className="nav-group">
+            <span className="nav-label">Research</span>
+
+            {RESEARCH_NAV_ITEMS.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                className={`nav-item${
+                  activeView === item.key ? ' active' : ''
+                }`}
+                onClick={() => onNavigate(item.key)}
+              >
+                <span className="nav-icon">
+                  {item.icon}
+                </span>
+
+                {item.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="sidebar-footer">
           <div className="user-chip">
